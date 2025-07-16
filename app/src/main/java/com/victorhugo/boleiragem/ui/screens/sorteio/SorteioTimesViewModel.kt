@@ -3,9 +3,6 @@ package com.victorhugo.boleiragem.ui.screens.sorteio
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
-import com.victorhugo.boleiragem.data.model.Jogador
-import com.victorhugo.boleiragem.data.model.ResultadoSorteio
 import com.victorhugo.boleiragem.data.repository.ConfiguracaoRepository
 import com.victorhugo.boleiragem.data.repository.JogadorRepository
 import com.victorhugo.boleiragem.data.repository.SorteioRepository
@@ -95,7 +92,7 @@ class SorteioTimesViewModel @Inject constructor(
 
                 // Após limpar, inicia um novo sorteio
                 sortearTimes()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Em caso de erro, desativa o loading
                 sorteioRepository.setSorteioEmAndamento(false)
             }
@@ -135,7 +132,7 @@ class SorteioTimesViewModel @Inject constructor(
                 // Marca que o sorteio foi concluído com sucesso
                 _sorteioRealizado.value = true
 
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Em caso de erro, desativa o loading
                 sorteioRepository.setSorteioEmAndamento(false)
             }

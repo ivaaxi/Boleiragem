@@ -2,6 +2,7 @@ package com.victorhugo.boleiragem.ui.screens.configuracao
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +62,11 @@ fun CriteriosSorteioCard(
                 }
             }
 
-            Divider(modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 16.dp),
+                thickness = DividerDefaults.Thickness,
+                color = DividerDefaults.color
+            )
 
             // Seção de critérios extras
             Text(

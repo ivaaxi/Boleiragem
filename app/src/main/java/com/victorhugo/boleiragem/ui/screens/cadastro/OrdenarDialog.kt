@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.victorhugo.boleiragem.data.model.CriterioOrdenacao
 
 @Composable
 fun OrdenarDialog(
@@ -38,14 +39,18 @@ fun OrdenarDialog(
                         .fillMaxWidth()
                         .selectable(
                             selected = criterioSelecionado == CriterioOrdenacao.ALFABETICO,
-                            onClick = { criterioSelecionado = CriterioOrdenacao.ALFABETICO }
+                            onClick = {
+                                criterioSelecionado = CriterioOrdenacao.ALFABETICO
+                            }
                         )
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
                         selected = criterioSelecionado == CriterioOrdenacao.ALFABETICO,
-                        onClick = { criterioSelecionado = CriterioOrdenacao.ALFABETICO }
+                        onClick = {
+                            criterioSelecionado = CriterioOrdenacao.ALFABETICO
+                        }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -60,14 +65,18 @@ fun OrdenarDialog(
                         .fillMaxWidth()
                         .selectable(
                             selected = criterioSelecionado == CriterioOrdenacao.PONTUACAO,
-                            onClick = { criterioSelecionado = CriterioOrdenacao.PONTUACAO }
+                            onClick = {
+                                criterioSelecionado = CriterioOrdenacao.PONTUACAO
+                            }
                         )
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
                         selected = criterioSelecionado == CriterioOrdenacao.PONTUACAO,
-                        onClick = { criterioSelecionado = CriterioOrdenacao.PONTUACAO }
+                        onClick = {
+                            criterioSelecionado = CriterioOrdenacao.PONTUACAO
+                        }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -82,14 +91,18 @@ fun OrdenarDialog(
                         .fillMaxWidth()
                         .selectable(
                             selected = criterioSelecionado == CriterioOrdenacao.JOGOS,
-                            onClick = { criterioSelecionado = CriterioOrdenacao.JOGOS }
+                            onClick = {
+                                criterioSelecionado = CriterioOrdenacao.JOGOS
+                            }
                         )
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
                         selected = criterioSelecionado == CriterioOrdenacao.JOGOS,
-                        onClick = { criterioSelecionado = CriterioOrdenacao.JOGOS }
+                        onClick = {
+                            criterioSelecionado = CriterioOrdenacao.JOGOS
+                        }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -98,24 +111,54 @@ fun OrdenarDialog(
                     )
                 }
 
-                // Opção POSICAO
+                // Opção POSICAO (agora separada)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .selectable(
                             selected = criterioSelecionado == CriterioOrdenacao.POSICAO,
-                            onClick = { criterioSelecionado = CriterioOrdenacao.POSICAO }
+                            onClick = {
+                                criterioSelecionado = CriterioOrdenacao.POSICAO
+                            }
                         )
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
                         selected = criterioSelecionado == CriterioOrdenacao.POSICAO,
-                        onClick = { criterioSelecionado = CriterioOrdenacao.POSICAO }
+                        onClick = {
+                            criterioSelecionado = CriterioOrdenacao.POSICAO
+                        }
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Posição e Nota",
+                        text = "Posição",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                // Nova Opção OVERAL
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = criterioSelecionado == CriterioOrdenacao.OVERAL,
+                            onClick = {
+                                criterioSelecionado = CriterioOrdenacao.OVERAL
+                            }
+                        )
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = criterioSelecionado == CriterioOrdenacao.OVERAL,
+                        onClick = {
+                            criterioSelecionado = CriterioOrdenacao.OVERAL
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Estrelas (Overal)",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

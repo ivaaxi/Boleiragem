@@ -17,7 +17,8 @@ class ConfiguracaoPontuacaoViewModel @Inject constructor(
     private val pontuacaoRepository: PontuacaoRepository
 ) : ViewModel() {
 
-    private val _configuracaoPontuacao = MutableStateFlow(ConfiguracaoPontuacao())
+    // Inicializa com um objeto padrão para evitar NullPointerException
+    private val _configuracaoPontuacao = MutableStateFlow(ConfiguracaoPontuacao(id = 1, pontosPorVitoria = 10, pontosPorDerrota = -10, pontosPorEmpate = -5))
     val configuracaoPontuacao: StateFlow<ConfiguracaoPontuacao> = _configuracaoPontuacao.asStateFlow()
 
     private val _salvandoConfiguracao = MutableStateFlow(false)
@@ -33,21 +34,30 @@ class ConfiguracaoPontuacaoViewModel @Inject constructor(
     private fun carregarConfiguracao() {
         viewModelScope.launch {
             pontuacaoRepository.getConfiguracaoPontuacao().collect { configuracao ->
-                _configuracaoPontuacao.value = configuracao
+                // Só atualiza se a configuração não for nula
+                if (configuracao != null) {
+                    _configuracaoPontuacao.value = configuracao
+                }
             }
         }
     }
 
     fun atualizarPontosPorVitoria(pontos: Int) {
-        _configuracaoPontuacao.value = _configuracaoPontuacao.value.copy(pontosPorVitoria = pontos)
+        // Adiciona verificação de nulidade para evitar NullPointerException
+        val configAtual = _configuracaoPontuacao.value ?: ConfiguracaoPontuacao()
+        _configuracaoPontuacao.value = configAtual.copy(pontosPorVitoria = pontos)
     }
 
     fun atualizarPontosPorDerrota(pontos: Int) {
-        _configuracaoPontuacao.value = _configuracaoPontuacao.value.copy(pontosPorDerrota = pontos)
+        // Adiciona verificação de nulidade para evitar NullPointerException
+        val configAtual = _configuracaoPontuacao.value ?: ConfiguracaoPontuacao()
+        _configuracaoPontuacao.value = configAtual.copy(pontosPorDerrota = pontos)
     }
 
     fun atualizarPontosPorEmpate(pontos: Int) {
-        _configuracaoPontuacao.value = _configuracaoPontuacao.value.copy(pontosPorEmpate = pontos)
+        // Adiciona verificação de nulidade para evitar NullPointerException
+        val configAtual = _configuracaoPontuacao.value ?: ConfiguracaoPontuacao()
+        _configuracaoPontuacao.value = configAtual.copy(pontosPorEmpate = pontos)
     }
 
     fun salvarConfiguracao() {
@@ -55,7 +65,9 @@ class ConfiguracaoPontuacaoViewModel @Inject constructor(
             _salvandoConfiguracao.value = true
 
             try {
-                pontuacaoRepository.atualizarConfiguracaoPontuacao(_configuracaoPontuacao.value)
+                // Verifica se a configuração não é nula antes de salvar
+                val configParaSalvar = _configuracaoPontuacao.value ?: ConfiguracaoPontuacao()
+                pontuacaoRepository.atualizarConfiguracaoPontuacao(configParaSalvar)
                 _configuracaoSalva.value = true
 
                 // Reset do estado após 2 segundos
@@ -64,6 +76,7 @@ class ConfiguracaoPontuacaoViewModel @Inject constructor(
 
             } catch (e: Exception) {
                 // Tratamento de erros
+                e.printStackTrace()
             } finally {
                 _salvandoConfiguracao.value = false
             }
