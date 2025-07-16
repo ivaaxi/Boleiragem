@@ -77,7 +77,7 @@ app/
 ## 📷 Screenshots
 
 <img width="261" height="476" alt="image" src="https://github.com/user-attachments/assets/826ea170-d889-4624-bc0a-d6fe866219f2" />
-<img width="265" height="424" alt="image" src="https://github.com/user-attachments/assets/b1cbb3d2-a3d8-4d30-a26b-29b460d48853" />
+<img width="268" height="486" alt="image" src="https://github.com/user-attachments/assets/29dca5d0-a07d-4b4c-a003-eda043110080" />
 <img width="265" height="484" alt="image" src="https://github.com/user-attachments/assets/5f0c9925-f476-4286-9c4a-58d4df234938" />
 <img width="268" height="481" alt="image" src="https://github.com/user-attachments/assets/aa337399-9931-4462-8c4c-edd38f8b2dd8" />
 
