@@ -76,19 +76,20 @@ app/
 
 ## 📷 Screenshots
 
-[Aqui você pode adicionar screenshots do seu aplicativo]
+<img width="261" height="476" alt="image" src="https://github.com/user-attachments/assets/826ea170-d889-4624-bc0a-d6fe866219f2" />
+<img width="265" height="424" alt="image" src="https://github.com/user-attachments/assets/b1cbb3d2-a3d8-4d30-a26b-29b460d48853" />
+<img width="265" height="484" alt="image" src="https://github.com/user-attachments/assets/5f0c9925-f476-4286-9c4a-58d4df234938" />
+<img width="268" height="481" alt="image" src="https://github.com/user-attachments/assets/aa337399-9931-4462-8c4c-edd38f8b2dd8" />
+
 
 ## 🤝 Contribuições
 
 Contribuições são bem-vindas! Sinta-se à vontade para abrir uma issue ou enviar um pull request.
 
-## 📄 Licença
-
-Este projeto está licenciado sob a [MIT License](LICENSE)
-
 ## 📞 Contato
 
-[Seu nome/informação de contato]
+Nome: Victor Hugo
+Tel.: (32)98470-2332
 
 ---
 
