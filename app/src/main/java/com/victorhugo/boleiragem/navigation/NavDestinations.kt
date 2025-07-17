@@ -8,7 +8,8 @@ sealed class NavDestinations(val route: String) {
     object CadastroJogadores : NavDestinations("cadastro_jogadores")
     object ConfiguracaoTimes : NavDestinations("configuracao_times")
     object SorteioTimes : NavDestinations("sorteio_times")
-    object HistoricoTimes : NavDestinations("historico_times")
+    object TimesAtuais : NavDestinations("times_atuais")
+    object Historico : NavDestinations("historico")
 
     // Outras rotas
     object DetalheJogador : NavDestinations("detalhe_jogador/{jogadorId}") {

@@ -29,10 +29,11 @@ import com.victorhugo.boleiragem.ui.screens.cadastro.CadastroJogadoresScreen
 import com.victorhugo.boleiragem.ui.screens.cadastro.DetalheJogadorScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.ConfiguracaoPontuacaoScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.ConfiguracaoTimesScreen
-import com.victorhugo.boleiragem.ui.screens.historico.HistoricoTimesScreen
+import com.victorhugo.boleiragem.ui.screens.historico.HistoricoScreen
 import com.victorhugo.boleiragem.ui.screens.sorteio.ResultadoSorteioScreen
 import com.victorhugo.boleiragem.ui.screens.sorteio.SorteioTimesScreen
 import com.victorhugo.boleiragem.ui.screens.splash.SplashScreen
+import com.victorhugo.boleiragem.ui.screens.times.TimesAtuaisScreen
 import com.victorhugo.boleiragem.ui.theme.BoleiragemTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -84,7 +85,7 @@ fun MainScreen() {
     // Configuração do pager
     val pagerState = rememberPagerState(
         initialPage = selectedTabIndex,
-        pageCount = { 4 } // 4 abas principais agora
+        pageCount = { 5 } // 5 abas principais agora (incluindo a nova aba de histórico)
     )
 
     // Efeito para sincronizar o selectedTabIndex com a página atual do pager
@@ -108,7 +109,8 @@ fun MainScreen() {
         NavDestinations.CadastroJogadores.route,
         NavDestinations.ConfiguracaoTimes.route,
         NavDestinations.SorteioTimes.route,
-        NavDestinations.HistoricoTimes.route
+        NavDestinations.TimesAtuais.route,
+        NavDestinations.Historico.route
     )
 
     // Scaffold com a barra de navegação inferior
@@ -206,7 +208,8 @@ fun MainScreen() {
                             // já que agora temos o botão de confirmar
                         }
                     )
-                    3 -> HistoricoTimesScreen() // Nova tela de histórico de times
+                    3 -> TimesAtuaisScreen() // Tela de times atuais
+                    4 -> HistoricoScreen() // Nova tela de histórico
                 }
             }
         }

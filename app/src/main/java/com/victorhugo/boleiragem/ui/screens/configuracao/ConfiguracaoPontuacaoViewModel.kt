@@ -67,7 +67,13 @@ class ConfiguracaoPontuacaoViewModel @Inject constructor(
             try {
                 // Verifica se a configuração não é nula antes de salvar
                 val configParaSalvar = _configuracaoPontuacao.value ?: ConfiguracaoPontuacao()
+
+                // Salva a configuração e recalcula a pontuação dos jogadores
                 pontuacaoRepository.atualizarConfiguracaoPontuacao(configParaSalvar)
+
+                // Aguarda um momento para garantir que o recálculo tenha sido concluído
+                kotlinx.coroutines.delay(500)
+
                 _configuracaoSalva.value = true
 
                 // Reset do estado após 2 segundos

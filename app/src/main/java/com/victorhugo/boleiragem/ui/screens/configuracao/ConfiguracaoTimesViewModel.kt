@@ -10,7 +10,9 @@ import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
 import com.victorhugo.boleiragem.data.model.CriterioSorteio
 import com.victorhugo.boleiragem.data.repository.ConfiguracaoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,6 +38,10 @@ class ConfiguracaoTimesViewModel @Inject constructor(
     // Todos os outros critérios são extras combináveis
     var criteriosExtras by mutableStateOf<Set<CriterioSorteio>>(emptySet())
         private set
+
+    // Estado para controlar o feedback de salvamento
+    private val _configSalva = MutableStateFlow(false)
+    val configSalva: StateFlow<Boolean> = _configSalva
 
     init {
         viewModelScope.launch {
@@ -103,6 +109,13 @@ class ConfiguracaoTimesViewModel @Inject constructor(
 
     fun salvarConfiguracoes() {
         saveConfiguracao()
+        // Ativar o estado de feedback
+        _configSalva.value = true
+        // Resetar o estado após 2 segundos
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2000)
+            _configSalva.value = false
+        }
     }
 
     fun atualizarJogadoresPorTime(valor: Int) {

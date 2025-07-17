@@ -1,10 +1,15 @@
 package com.victorhugo.boleiragem.data.db
 
 import androidx.room.TypeConverter
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.victorhugo.boleiragem.data.model.CriterioSorteio
+import com.victorhugo.boleiragem.data.model.HistoricoTimeSnapshot
 import com.victorhugo.boleiragem.data.model.PosicaoJogador
 
 class Converters {
+    private val gson = Gson()
+
     @TypeConverter
     fun fromPosicaoJogador(posicao: PosicaoJogador?): String? {
         return posicao?.name
@@ -44,5 +49,16 @@ class Converters {
         } else {
             data.split(",").map { it.toLong() }
         }
+    }
+
+    @TypeConverter
+    fun fromHistoricoTimeSnapshotList(value: List<HistoricoTimeSnapshot>): String {
+        return gson.toJson(value)
+    }
+
+    @TypeConverter
+    fun toHistoricoTimeSnapshotList(value: String): List<HistoricoTimeSnapshot> {
+        val listType = object : TypeToken<List<HistoricoTimeSnapshot>>() {}.type
+        return gson.fromJson(value, listType) ?: emptyList()
     }
 }

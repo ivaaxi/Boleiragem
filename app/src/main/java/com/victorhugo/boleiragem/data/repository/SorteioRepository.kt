@@ -41,7 +41,7 @@ class SorteioRepository @Inject constructor(
 
     // Método para efetivamente salvar os times no banco de dados após confirmação do usuário
     fun salvarTimesNoBancoDeDados(resultado: ResultadoSorteio) {
-        val historicoTimes = resultado.times.map { time ->
+        val historicoTimes = resultado.times.mapIndexed { index, time ->
             // Calcular a média de estrelas do time
             val mediaEstrelas = time.jogadores.map { jogador ->
                 jogador.notaPosicaoPrincipal.toFloat()
@@ -52,8 +52,20 @@ class SorteioRepository @Inject constructor(
                 jogador.pontuacaoTotal.toFloat()
             }.average().toFloat()
 
+            // Encontrar o jogador com maior pontuação ou estrelas para nomear o time
+            val jogadorDestaque = when (resultado.tipoDeSorteio) {
+                "Estrelas" -> time.jogadores.maxByOrNull { it.notaPosicaoPrincipal }
+                else -> time.jogadores.maxByOrNull { it.pontuacaoTotal }
+            } ?: time.jogadores.firstOrNull()
+
+            val nomeTime = if (jogadorDestaque != null) {
+                "Time do ${jogadorDestaque.nome}"
+            } else {
+                "Time ${index + 1}"
+            }
+
             HistoricoTime(
-                nome = time.nome,
+                nome = nomeTime,
                 jogadoresIds = time.jogadores.map { it.id },
                 mediaEstrelas = mediaEstrelas,
                 mediaPontuacao = mediaPontuacao,

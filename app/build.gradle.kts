@@ -69,6 +69,9 @@ dependencies {
     implementation(libs.androidx.foundation.layout)
     kapt("androidx.room:room-compiler:2.6.1")
 
+    // Gson para serialização/deserialização JSON
+    implementation("com.google.code.gson:gson:2.10.1")
+
     // Dagger Hilt
     implementation("com.google.dagger:hilt-android:2.48")
     kapt("com.google.dagger:hilt-android-compiler:2.48")

@@ -20,6 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.victorhugo.boleiragem.data.model.Jogador
+import com.victorhugo.boleiragem.ui.common.Dimensions.standardButtonHeight
+import com.victorhugo.boleiragem.ui.common.Dimensions.standardButtonWidth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,9 +54,9 @@ fun SorteioTimesScreen(
             text = {
                 Text(
                     "Existe uma pelada em andamento que ainda não foi registrada " +
-                    "(vitórias/derrotas/empates ainda não foram contabilizados). " +
-                    "\n\nSe continuar, o sorteio anterior será descartado e um novo será realizado. " +
-                    "\n\nDeseja continuar mesmo assim?"
+                            "(vitórias/derrotas/empates ainda não foram contabilizados). " +
+                            "\n\nSe continuar, o sorteio anterior será descartado e um novo será realizado. " +
+                            "\n\nDeseja continuar mesmo assim?"
                 )
             },
             confirmButton = {
@@ -215,9 +217,9 @@ fun SorteioTimesScreen(
                 enabled = viewModel.jogadoresSelecionados.isNotEmpty() && !loading,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .height(56.dp)
+                    .width(standardButtonWidth)
+                    .height(standardButtonHeight)
             ) {
                 Text("SORTEAR TIMES")
             }

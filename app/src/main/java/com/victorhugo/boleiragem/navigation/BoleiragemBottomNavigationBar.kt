@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Rule
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -49,9 +50,14 @@ fun BoleiragemBottomNavigationBar(
             icon = Icons.Default.PlayArrow
         ),
         BottomNavItem(
-            route = NavDestinations.HistoricoTimes.route,
-            title = "Times",
+            route = NavDestinations.TimesAtuais.route,
+            title = "Jogo",
             icon = Icons.Default.EmojiEvents
+        ),
+        BottomNavItem(
+            route = NavDestinations.Historico.route,
+            title = "Histórico",
+            icon = Icons.Default.History
         )
     )
 

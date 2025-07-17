@@ -112,7 +112,7 @@ fun HistoricoTimesScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.apagarPeladaAtual()
+                        viewModel.cancelarPeladaAtual()
                         showDialogApagar = false
                     },
                     colors = ButtonDefaults.buttonColors(

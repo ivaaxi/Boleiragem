@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoDao
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoPontuacaoDao
+import com.victorhugo.boleiragem.data.dao.HistoricoPeladaDao
 import com.victorhugo.boleiragem.data.dao.HistoricoTimeDao
 import com.victorhugo.boleiragem.data.dao.JogadorDao
 import com.victorhugo.boleiragem.data.db.BoleiragemDatabase
@@ -54,5 +55,10 @@ object DatabaseModule {
     @Provides
     fun provideConfiguracaoPontuacaoDao(database: BoleiragemDatabase): ConfiguracaoPontuacaoDao {
         return database.configuracaoPontuacaoDao()
+    }
+
+    @Provides
+    fun provideHistoricoPeladaDao(database: BoleiragemDatabase): HistoricoPeladaDao {
+        return database.historicoPeladaDao()
     }
 }

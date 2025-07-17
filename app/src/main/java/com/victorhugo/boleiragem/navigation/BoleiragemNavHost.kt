@@ -53,6 +53,8 @@ fun BoleiragemNavHost(
             composable(route = NavDestinations.CadastroJogadores.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
             composable(route = NavDestinations.ConfiguracaoTimes.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
             composable(route = NavDestinations.SorteioTimes.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
+            composable(route = NavDestinations.TimesAtuais.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
+            composable(route = NavDestinations.Historico.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
         }
 
         // Tela de detalhes do jogador (sem bottom navigation)

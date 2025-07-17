@@ -7,10 +7,12 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoDao
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoPontuacaoDao
+import com.victorhugo.boleiragem.data.dao.HistoricoPeladaDao
 import com.victorhugo.boleiragem.data.dao.HistoricoTimeDao
 import com.victorhugo.boleiragem.data.dao.JogadorDao
 import com.victorhugo.boleiragem.data.model.ConfiguracaoPontuacao
 import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
+import com.victorhugo.boleiragem.data.model.HistoricoPelada
 import com.victorhugo.boleiragem.data.model.HistoricoTime
 import com.victorhugo.boleiragem.data.model.Jogador
 
@@ -19,9 +21,10 @@ import com.victorhugo.boleiragem.data.model.Jogador
         Jogador::class,
         ConfiguracaoSorteio::class,
         HistoricoTime::class,
-        ConfiguracaoPontuacao::class
+        ConfiguracaoPontuacao::class,
+        HistoricoPelada::class
     ],
-    version = 6, // Incrementado de 5 para 6
+    version = 7, // Incrementado de 6 para 7
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -30,6 +33,7 @@ abstract class BoleiragemDatabase : RoomDatabase() {
     abstract fun configuracaoDao(): ConfiguracaoDao
     abstract fun historicoTimeDao(): HistoricoTimeDao
     abstract fun configuracaoPontuacaoDao(): ConfiguracaoPontuacaoDao
+    abstract fun historicoPeladaDao(): HistoricoPeladaDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -128,6 +132,21 @@ abstract class BoleiragemDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE historico_time ADD COLUMN mediaEstrelas REAL NOT NULL DEFAULT 0.0")
                 database.execSQL("ALTER TABLE historico_time ADD COLUMN mediaPontuacao REAL NOT NULL DEFAULT 0.0")
                 database.execSQL("ALTER TABLE historico_time ADD COLUMN isUltimoPelada INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Criar a tabela de histórico de peladas
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `historico_pelada` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `dataFinalizacao` INTEGER NOT NULL,
+                        `times` TEXT NOT NULL
+                    )
+                    """
+                )
             }
         }
     }
