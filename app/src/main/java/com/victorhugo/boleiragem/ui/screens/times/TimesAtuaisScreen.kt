@@ -1,6 +1,9 @@
 package com.victorhugo.boleiragem.ui.screens.times
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,18 +13,20 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Sports
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.victorhugo.boleiragem.data.model.HistoricoTime
 import com.victorhugo.boleiragem.ui.common.Dimensions
 import com.victorhugo.boleiragem.ui.screens.historico.HistoricoTimesViewModel
@@ -116,6 +121,7 @@ fun TimesAtuaisScreen(
         TransferenciaJogadorDialog(
             times = historicoTimes,
             jogadoresPorTime = jogadoresPorTime,
+            modoSubstituicaoTimeReserva = viewModel.modoSubstituicaoTimeReserva.collectAsState().value,
             onDismiss = { viewModel.fecharDialogoTransferencia() },
             onTransferirJogador = { jogador, timeOrigemId, timeDestinoId ->
                 viewModel.transferirJogador(jogador, timeOrigemId, timeDestinoId)
@@ -225,7 +231,8 @@ fun TimesAtuaisScreen(
                                 onEmpateClick = { viewModel.adicionarEmpate(time) },
                                 onDiminuirVitoriaClick = { viewModel.diminuirVitoria(time) },
                                 onDiminuirDerrotaClick = { viewModel.diminuirDerrota(time) },
-                                onDiminuirEmpateClick = { viewModel.diminuirEmpate(time) }
+                                onDiminuirEmpateClick = { viewModel.diminuirEmpate(time) },
+                                onSubstituicaoClick = { viewModel.mostrarDialogoTransferencia() }
                             )
                         }
                     }
@@ -318,7 +325,8 @@ fun TimeCard(
     onEmpateClick: () -> Unit,
     onDiminuirVitoriaClick: () -> Unit = {},
     onDiminuirDerrotaClick: () -> Unit = {},
-    onDiminuirEmpateClick: () -> Unit = {}
+    onDiminuirEmpateClick: () -> Unit = {},
+    onSubstituicaoClick: () -> Unit = {} // Adicionando o parâmetro para substituição
 ) {
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
     val dataFormatada = remember(time.dataUltimoSorteio) {
@@ -346,7 +354,7 @@ fun TimeCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = time.nome,
+                    text = if (time.ehTimeReserva) "Time Reserva" else time.nome,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -402,244 +410,233 @@ fun TimeCard(
                 }
             }
 
-            // Estatísticas com botão de edição
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Botão de edição
-                IconButton(
-                    onClick = { modoEdicao = !modoEdicao }
+            // Para times de reserva, não exibimos estatísticas de vitórias/derrotas/empates
+            // Em vez disso, mostramos um botão de substituição
+            if (time.ehTimeReserva) {
+                // Seção especial para Time Reserva com botão de substituição
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = if (modoEdicao) "Desativar Edição" else "Ativar Edição",
-                        tint = if (modoEdicao) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
+                    Column {
+                        Text(
+                            text = "Time de Reserva",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Este time está disponível para substituições",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Botão de substituição
+                    Button(
+                        onClick = onSubstituicaoClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        ),
+                        modifier = Modifier.size(56.dp), // Aumentando o tamanho para caber o ícone
+                        contentPadding = PaddingValues(0.dp) // Remove padding interno
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SwapHoriz,
+                            contentDescription = "Substituição",
+                            modifier = Modifier.size(28.dp) // Ícone um pouco maior
+                        )
+                    }
+                }
+            } else if (!time.ehTimeReserva) {
+                // Estatísticas com botão de edição
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Coluna de estatísticas
+                    Column {
+                        Text(
+                            text = "Estatísticas:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "V: ${time.vitorias}",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = "D: ${time.derrotas}",
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = "E: ${time.empates}",
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Botão de edição para mostrar/esconder os controles
+                    IconButton(
+                        onClick = { modoEdicao = !modoEdicao }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Editar estatísticas",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
-                // Container para as estatísticas
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                // Controles para editar estatísticas (visíveis apenas quando modoEdicao é verdadeiro)
+                AnimatedVisibility(
+                    visible = modoEdicao,
+                    enter = fadeIn(initialAlpha = 0.3f),
+                    exit = fadeOut(animationSpec = tween(250))
                 ) {
-                    // Vitórias
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
                     ) {
-                        Text(
-                            text = "Vitórias",
-                            style = MaterialTheme.typography.bodyMedium
+                        // Controles de vitória
+                        EstatisticaControle(
+                            titulo = "Vitórias:",
+                            valor = time.vitorias,
+                            corTexto = MaterialTheme.colorScheme.primary,
+                            onAdicionar = { onVitoriaClick() },
+                            onDiminuir = { onDiminuirVitoriaClick() }
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            IconButton(
-                                onClick = onDiminuirVitoriaClick,
-                                enabled = modoEdicao && time.vitorias > 0
-                            ) {
-                                Icon(
-                                    Icons.Default.Remove,
-                                    contentDescription = "Diminuir Vitória",
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (modoEdicao && time.vitorias > 0)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                )
-                            }
-                            Text(
-                                text = time.vitorias.toString(),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            IconButton(
-                                onClick = onVitoriaClick,
-                                enabled = modoEdicao
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Adicionar Vitória",
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (modoEdicao)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                )
-                            }
-                        }
-                    }
 
-                    // Empates
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "Empates",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            IconButton(
-                                onClick = onDiminuirEmpateClick,
-                                enabled = modoEdicao && time.empates > 0
-                            ) {
-                                Icon(
-                                    Icons.Default.Remove,
-                                    contentDescription = "Diminuir Empate",
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (modoEdicao && time.empates > 0)
-                                        MaterialTheme.colorScheme.tertiary
-                                    else
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                )
-                            }
-                            Text(
-                                text = time.empates.toString(),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-                            IconButton(
-                                onClick = onEmpateClick,
-                                enabled = modoEdicao
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Adicionar Empate",
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (modoEdicao)
-                                        MaterialTheme.colorScheme.tertiary
-                                    else
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                )
-                            }
-                        }
-                    }
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    // Derrotas
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "Derrotas",
-                            style = MaterialTheme.typography.bodyMedium
+                        // Controles de derrota
+                        EstatisticaControle(
+                            titulo = "Derrotas:",
+                            valor = time.derrotas,
+                            corTexto = MaterialTheme.colorScheme.error,
+                            onAdicionar = { onDerrotaClick() },
+                            onDiminuir = { onDiminuirDerrotaClick() }
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            IconButton(
-                                onClick = onDiminuirDerrotaClick,
-                                enabled = modoEdicao && time.derrotas > 0
-                            ) {
-                                Icon(
-                                    Icons.Default.Remove,
-                                    contentDescription = "Diminuir Derrota",
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (modoEdicao && time.derrotas > 0)
-                                        MaterialTheme.colorScheme.error
-                                    else
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                )
-                            }
-                            Text(
-                                text = time.derrotas.toString(),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            IconButton(
-                                onClick = onDerrotaClick,
-                                enabled = modoEdicao
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Adicionar Derrota",
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (modoEdicao)
-                                        MaterialTheme.colorScheme.error
-                                    else
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                )
-                            }
-                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Controles de empate
+                        EstatisticaControle(
+                            titulo = "Empates:",
+                            valor = time.empates,
+                            corTexto = MaterialTheme.colorScheme.tertiary,
+                            onAdicionar = { onEmpateClick() },
+                            onDiminuir = { onDiminuirEmpateClick() }
+                        )
                     }
                 }
             }
 
-            // Seção expansível - Lista de jogadores
-            AnimatedVisibility(visible = expandido) {
+            // Jogadores - visíveis apenas quando o card estiver expandido
+            AnimatedVisibility(
+                visible = expandido,
+                enter = fadeIn(initialAlpha = 0.3f),
+                exit = fadeOut(animationSpec = tween(250))
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp)
                 ) {
-                    Divider(modifier = Modifier.padding(bottom = 8.dp))
-
                     Text(
-                        text = "Jogadores",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        text = "Jogadores:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
                     )
 
-                    // Lista de jogadores
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     jogadores.forEach { jogador ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = jogador.nome,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${jogador.notaPosicaoPrincipal}★",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.EmojiEvents,
-                                        contentDescription = "Pontuação",
-                                        modifier = Modifier.size(12.dp),
-                                        tint = MaterialTheme.colorScheme.secondary
-                                    )
-                                    Text(
-                                        text = "${jogador.pontuacaoTotal}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            text = "${jogador.nome} (${jogador.posicaoPrincipal.sigla})",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun EstatisticaControle(
+    titulo: String,
+    valor: Int,
+    corTexto: Color,
+    onAdicionar: () -> Unit,
+    onDiminuir: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = titulo,
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Botão para diminuir
+            IconButton(
+                onClick = onDiminuir,
+                enabled = valor > 0
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = "Diminuir",
+                    tint = if (valor > 0) corTexto else MaterialTheme.colorScheme.outline
+                )
+            }
+
+            // Valor atual
+            Text(
+                text = valor.toString(),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = corTexto,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            // Botão para adicionar
+            IconButton(
+                onClick = onAdicionar
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Adicionar",
+                    tint = corTexto
+                )
             }
         }
     }

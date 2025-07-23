@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import com.victorhugo.boleiragem.ui.screens.cadastro.CadastroJogadoresScreen
 import com.victorhugo.boleiragem.ui.screens.cadastro.DetalheJogadorScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.ConfiguracaoPontuacaoScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.ConfiguracaoTimesScreen
+import com.victorhugo.boleiragem.ui.screens.configuracao.GerenciadorPerfisScreen
 import com.victorhugo.boleiragem.ui.screens.historico.HistoricoScreen
 import com.victorhugo.boleiragem.ui.screens.sorteio.ResultadoSorteioScreen
 import com.victorhugo.boleiragem.ui.screens.sorteio.SorteioTimesScreen
@@ -41,7 +43,7 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Instalar SplashScreen antes de chamar super.onCreate()
+        // Reativando a splash screen agora que o problema dos ícones foi corrigido
         installSplashScreen()
 
         super.onCreate(savedInstanceState)
@@ -85,7 +87,7 @@ fun MainScreen() {
     // Configuração do pager
     val pagerState = rememberPagerState(
         initialPage = selectedTabIndex,
-        pageCount = { 5 } // 5 abas principais agora (incluindo a nova aba de histórico)
+        pageCount = { 6 } // Agora 6 abas principais (incluindo a nova aba de estatísticas)
     )
 
     // Efeito para sincronizar o selectedTabIndex com a página atual do pager
@@ -110,7 +112,8 @@ fun MainScreen() {
         NavDestinations.ConfiguracaoTimes.route,
         NavDestinations.SorteioTimes.route,
         NavDestinations.TimesAtuais.route,
-        NavDestinations.Historico.route
+        NavDestinations.Historico.route,
+        NavDestinations.Estatisticas.route
     )
 
     // Scaffold com a barra de navegação inferior
@@ -175,6 +178,16 @@ fun MainScreen() {
                                     }
                                 )
                             }
+                        },
+                        onNavigateToGerenciadorPerfis = {
+                            isSecondaryScreen = true
+                            secondaryScreenContent = {
+                                GerenciadorPerfisScreen(
+                                    onNavigateBack = {
+                                        isSecondaryScreen = false
+                                    }
+                                )
+                            }
                         }
                     )
                     2 -> SorteioTimesScreen(
@@ -210,6 +223,16 @@ fun MainScreen() {
                     )
                     3 -> TimesAtuaisScreen() // Tela de times atuais
                     4 -> HistoricoScreen() // Nova tela de histórico
+                    5 -> {
+                        // Tela de estatísticas
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Placeholder para a tela de estatísticas
+                            Text("Tela de Estatísticas")
+                        }
+                    }
                 }
             }
         }

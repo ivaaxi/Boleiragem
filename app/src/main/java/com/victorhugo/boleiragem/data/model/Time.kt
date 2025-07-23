@@ -3,7 +3,8 @@ package com.victorhugo.boleiragem.data.model
 data class Time(
     val id: Int,
     val nome: String,
-    val jogadores: List<Jogador>
+    val jogadores: List<Jogador>,
+    val ehTimeReserva: Boolean = false
 )
 
 data class ResultadoSorteio(

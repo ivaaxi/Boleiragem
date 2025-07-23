@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -293,103 +295,160 @@ fun TimeCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Título do Time
-            Text(
-                text = time.nome,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            // Verificamos se é o Time Reserva
+            val isTimeReserva = time.nome == "Time Reserva"
+
+            // Título do Time com estilo diferente para o Time Reserva
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = time.nome,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isTimeReserva) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                )
+            }
 
             Divider()
 
-            Text(
-                text = "Selecione o capitão:",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium
-            )
-
-            // Lista de jogadores com opção de selecionar capitão
-            time.jogadores.forEach { jogador ->
-                val isCapitao = jogador.id == capitaoId
-                val tint = if (isCapitao) MaterialTheme.colorScheme.primary else Color.LightGray
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clickable { onJogadorClick(jogador) },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            // Se for o Time Reserva, mostramos uma explicação sobre sua função
+            if (isTimeReserva) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Column(
+                        modifier = Modifier.padding(8.dp)
                     ) {
-                        RadioButton(
-                            selected = isCapitao,
-                            onClick = { onJogadorClick(jogador) }
+                        Text(
+                            text = "Time de Revezamento",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
-
-                        Column {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = jogador.nome,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = if (isCapitao) FontWeight.Bold else FontWeight.Normal
-                                )
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.EmojiEvents,
-                                        contentDescription = "Pontuação",
-                                        modifier = Modifier.size(12.dp),
-                                        tint = MaterialTheme.colorScheme.secondary
-                                    )
-                                    Text(
-                                        text = "${jogador.pontuacaoTotal}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
-                                }
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = jogador.posicaoPrincipal.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
-                                Text(
-                                    text = "${jogador.notaPosicaoPrincipal}★",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
+                        Text(
+                            text = "Os jogadores do Time Reserva farão revezamento com os times que perderem partidas. Um jogador reserva substitui um jogador do time perdedor após cada jogo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
                     }
+                }
 
-                    if (isCapitao) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = MaterialTheme.shapes.small
-                        ) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Jogadores para revezamento:",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+
+                // Lista de jogadores reserva sem opção de selecionar capitão
+                time.jogadores.forEach { jogador ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
                             Text(
-                                text = "Capitão",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                text = jogador.nome,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+
+                            Text(
+                                text = "${jogador.posicaoPrincipal.name} (${jogador.notaPosicaoPrincipal}⭐)",
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
+
+                        Text(
+                            text = "${jogador.pontuacaoTotal} pts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                // Para times normais, mostra a opção de selecionar capitão
+                Text(
+                    text = "Selecione o capitão:",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+
+                // Lista de jogadores com opção de selecionar capitão
+                time.jogadores.forEach { jogador ->
+                    val isCapitao = jogador.id == capitaoId
+                    val tint = if (isCapitao) MaterialTheme.colorScheme.primary else Color.LightGray
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable { onJogadorClick(jogador) },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            RadioButton(
+                                selected = isCapitao,
+                                onClick = { onJogadorClick(jogador) }
+                            )
+
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = jogador.nome,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (isCapitao) FontWeight.Bold else FontWeight.Normal
+                                    )
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.EmojiEvents,
+                                            contentDescription = "Pontuação",
+                                            modifier = Modifier.size(12.dp),
+                                            tint = tint
+                                        )
+
+                                        if (isCapitao) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Capitão",
+                                                modifier = Modifier.size(12.dp),
+                                                tint = tint
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = "${jogador.posicaoPrincipal.name} (${jogador.notaPosicaoPrincipal}⭐)",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "${jogador.pontuacaoTotal} pts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

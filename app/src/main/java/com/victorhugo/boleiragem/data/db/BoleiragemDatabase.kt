@@ -24,7 +24,7 @@ import com.victorhugo.boleiragem.data.model.Jogador
         ConfiguracaoPontuacao::class,
         HistoricoPelada::class
     ],
-    version = 7, // Incrementado de 6 para 7
+    version = 9, // Incrementado de 8 para 9
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -147,6 +147,20 @@ abstract class BoleiragemDatabase : RoomDatabase() {
                     )
                     """
                 )
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Adicionar coluna 'disponivel' à tabela 'jogadores' com valor padrão de 1 (true)
+                database.execSQL("ALTER TABLE jogadores ADD COLUMN disponivel INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Adicionar a coluna ehTimeReserva à tabela historico_time com valor padrão 0 (false)
+                database.execSQL("ALTER TABLE `historico_time` ADD COLUMN `ehTimeReserva` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

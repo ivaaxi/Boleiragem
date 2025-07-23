@@ -46,6 +46,14 @@ class HistoricoTimesViewModel @Inject constructor(
     private val _mostrarDialogoTransferencia = MutableStateFlow(false)
     val mostrarDialogoTransferencia: StateFlow<Boolean> = _mostrarDialogoTransferencia.asStateFlow()
 
+    // Estado para controlar se é uma substituição específica do time reserva
+    private val _modoSubstituicaoTimeReserva = MutableStateFlow(false)
+    val modoSubstituicaoTimeReserva: StateFlow<Boolean> = _modoSubstituicaoTimeReserva.asStateFlow()
+
+    // Estado para armazenar o time pré-selecionado (quando vem do botão do time reserva)
+    private val _timePreSelecionado = MutableStateFlow<HistoricoTime?>(null)
+    val timePreSelecionado: StateFlow<HistoricoTime?> = _timePreSelecionado.asStateFlow()
+
     // Estado para controlar a visibilidade do componente de confronto
     private val _mostrarComponenteConfronto = MutableStateFlow(false)
     val mostrarComponenteConfronto = _mostrarComponenteConfronto.asStateFlow()
@@ -310,14 +318,23 @@ class HistoricoTimesViewModel @Inject constructor(
         }
     }
 
-    // Mostrar o diálogo de transferência de jogadores
+    // Mostrar o diálogo de transferência de jogadores (modo normal)
     fun mostrarDialogoTransferencia() {
+        _modoSubstituicaoTimeReserva.value = false
+        _mostrarDialogoTransferencia.value = true
+    }
+
+    // Método específico para abrir transferência com time reserva
+    fun mostrarDialogoTransferenciaTimeReserva() {
+        _modoSubstituicaoTimeReserva.value = true
         _mostrarDialogoTransferencia.value = true
     }
 
     // Fechar o diálogo de transferência de jogadores
     fun fecharDialogoTransferencia() {
         _mostrarDialogoTransferencia.value = false
+        _modoSubstituicaoTimeReserva.value = false
+        _timePreSelecionado.value = null // Limpar o time pré-selecionado
     }
 
     // Transferir jogador entre times
@@ -429,5 +446,15 @@ class HistoricoTimesViewModel @Inject constructor(
             // Oculta o componente após a finalização
             ocultarComponenteConfronto()
         }
+    }
+
+    // Método para abrir a tela de transferência específica para time reserva
+    fun abrirTransferenciaTimeReserva(timeReserva: HistoricoTime) {
+        // Definir o time reserva como pré-selecionado
+        _timePreSelecionado.value = timeReserva
+        // Ativar o modo substituição time reserva
+        _modoSubstituicaoTimeReserva.value = true
+        // Mostrar o diálogo de transferência
+        _mostrarDialogoTransferencia.value = true
     }
 }

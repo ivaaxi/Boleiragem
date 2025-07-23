@@ -1,24 +1,21 @@
 package com.victorhugo.boleiragem.ui.screens.sorteio
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
 import com.victorhugo.boleiragem.data.model.Jogador
 import com.victorhugo.boleiragem.ui.common.Dimensions.standardButtonHeight
 import com.victorhugo.boleiragem.ui.common.Dimensions.standardButtonWidth
@@ -35,6 +32,11 @@ fun SorteioTimesScreen(
     val loading by viewModel.loading.collectAsState()
     val sorteioRealizado by viewModel.sorteioRealizado.collectAsState()
     val mostrarDialogConfirmacao by viewModel.mostrarDialogConfirmacao.collectAsState()
+    val temPeladaAtiva by viewModel.temPeladaAtiva.collectAsState(initial = false)
+    val botaoSorteioHabilitado by viewModel.botaoSorteioHabilitado.collectAsState(initial = true)
+
+    // Estado para controlar a expansão do dropdown
+    var dropdownExpandido by remember { mutableStateOf(false) }
 
     LaunchedEffect(sorteioRealizado) {
         if (sorteioRealizado) {
@@ -96,33 +98,84 @@ fun SorteioTimesScreen(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Cabeçalho com informações sobre jogadores e times
-                if (configuracao != null) {
+                // Aviso de pelada ativa
+                if (temPeladaAtiva) {
                     Card(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        )
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Configuração",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Informação",
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(24.dp)
                             )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
+                            Spacer(modifier = Modifier.width(16.dp))
                             Text(
-                                text = "Times: ${configuracao!!.qtdTimes} | Jogadores por Time: ${configuracao!!.qtdJogadoresPorTime}",
+                                text = "Há uma pelada em andamento. Registre o resultado para fazer um novo sorteio.",
                                 style = MaterialTheme.typography.bodyMedium
                             )
+                        }
+                    }
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                            Text(
-                                text = "Jogadores selecionados: ${viewModel.jogadoresSelecionados.size} / ${jogadores.size}",
-                                style = MaterialTheme.typography.bodyMedium
+                // Substituir o Card de Configuração por um Dropdown de perfis
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Configuração do Sorteio",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Dropdown para seleção de configuração
+                        ExposedDropdownMenuBox(
+                            expanded = dropdownExpandido,
+                            onExpandedChange = { if (!temPeladaAtiva) dropdownExpandido = !dropdownExpandido }
+                        ) {
+                            OutlinedTextField(
+                                value = configuracao?.nome ?: "Selecione uma configuração",
+                                onValueChange = { },
+                                readOnly = true,
+                                enabled = !temPeladaAtiva,
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpandido)
+                                },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth(),
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                             )
+
+                            ExposedDropdownMenu(
+                                expanded = dropdownExpandido,
+                                onDismissRequest = { dropdownExpandido = false }
+                            ) {
+                                // Mostra os perfis reais de configuração
+                                viewModel.configuracoesDisponiveis.forEach { config ->
+                                    DropdownMenuItem(
+                                        text = { Text(config.nome) },
+                                        onClick = {
+                                            viewModel.selecionarConfiguracao(config)
+                                            dropdownExpandido = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -141,20 +194,43 @@ fun SorteioTimesScreen(
                 // Botões para selecionar/desmarcar todos
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp) // Reduzido o espaçamento
                 ) {
                     OutlinedButton(
-                        onClick = { viewModel.selecionarTodos() },
-                        modifier = Modifier.weight(1f)
+                        onClick = { viewModel.selecionarDisponiveis() },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp), // Ajustado o padding interno
+                        enabled = !temPeladaAtiva
                     ) {
-                        Text("Selecionar Todos")
+                        Text(
+                            "Disp.", // Abreviado para evitar quebra de linha
+                            maxLines = 1, // Força texto em uma única linha
+                            overflow = TextOverflow.Ellipsis // Adiciona elipses caso o texto não caiba
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.selecionarTodos() },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                        enabled = !temPeladaAtiva
+                    ) {
+                        Text(
+                            "Todos",
+                            maxLines = 1
+                        )
                     }
 
                     OutlinedButton(
                         onClick = { viewModel.desmarcarTodos() },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                        enabled = !temPeladaAtiva
                     ) {
-                        Text("Desmarcar Todos")
+                        Text(
+                            "Nenhum",
+                            maxLines = 1
+                        )
                     }
                 }
 
@@ -171,7 +247,8 @@ fun SorteioTimesScreen(
                             selecionado = viewModel.jogadoresSelecionados.contains(jogador.id),
                             onSelecaoChange = { selecionado ->
                                 viewModel.toggleJogadorSelecionado(jogador.id, selecionado)
-                            }
+                            },
+                            enabled = !temPeladaAtiva
                         )
                     }
                 }
@@ -211,17 +288,30 @@ fun SorteioTimesScreen(
                 }
             }
 
-            // Botão fixo na parte inferior
+            // Botão fixo na parte inferior com estilo melhorado
             Button(
                 onClick = { viewModel.verificarESortearTimes() },
-                enabled = viewModel.jogadoresSelecionados.isNotEmpty() && !loading,
+                enabled = viewModel.jogadoresSelecionados.isNotEmpty() && !loading && botaoSorteioHabilitado,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 16.dp, vertical = 16.dp)
                     .width(standardButtonWidth)
-                    .height(standardButtonHeight)
+                    .height(standardButtonHeight),
+                colors = ButtonDefaults.buttonColors(
+                    // Verde quando habilitado, cinza quando desabilitado
+                    containerColor = if (viewModel.jogadoresSelecionados.isNotEmpty() && !loading && botaoSorteioHabilitado)
+                        Color(0xFF4CAF50) // Verde
+                    else
+                        Color(0xFFBDBDBD), // Cinza
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFE0E0E0),
+                    disabledContentColor = Color(0xFF9E9E9E)
+                )
             ) {
-                Text("SORTEAR TIMES")
+                Text(
+                    "SORTEAR TIMES",
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -231,7 +321,8 @@ fun SorteioTimesScreen(
 fun JogadorItemSelecao(
     jogador: Jogador,
     selecionado: Boolean,
-    onSelecaoChange: (Boolean) -> Unit
+    onSelecaoChange: (Boolean) -> Unit,
+    enabled: Boolean = true
 ) {
     Card(
         modifier = Modifier
@@ -259,7 +350,8 @@ fun JogadorItemSelecao(
 
             Checkbox(
                 checked = selecionado,
-                onCheckedChange = onSelecaoChange
+                onCheckedChange = onSelecaoChange,
+                enabled = enabled
             )
         }
     }

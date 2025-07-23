@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,6 +31,30 @@ class SorteioRepository @Inject constructor(
     // Flag para controlar se há um sorteio não contabilizado
     private val _temSorteioNaoContabilizado = MutableStateFlow(false)
     val temSorteioNaoContabilizado: StateFlow<Boolean> = _temSorteioNaoContabilizado.asStateFlow()
+
+    // Flag para controlar se há uma pelada ativa
+    private val _temPeladaAtiva = MutableStateFlow(false)
+    val temPeladaAtiva: StateFlow<Boolean> = _temPeladaAtiva.asStateFlow()
+
+    init {
+        // Verifica se existe uma pelada ativa ao inicializar o repositório
+        scope.launch {
+            verificarPeladaAtiva()
+        }
+    }
+
+    // Método para verificar se existe uma pelada ativa no banco de dados
+    private suspend fun verificarPeladaAtiva() {
+        val timesUltimaPelada = historicoTimeDao.getTimesUltimaPelada().first()
+        _temPeladaAtiva.value = timesUltimaPelada.isNotEmpty()
+        _temSorteioNaoContabilizado.value = timesUltimaPelada.isNotEmpty()
+
+        // Se tiver pelada ativa, carrega os dados dela
+        if (_temPeladaAtiva.value && _resultadoSorteio.value == null) {
+            // Aqui você poderia reconstruir o objeto ResultadoSorteio a partir dos times salvos
+            // Por enquanto apenas sinalizamos que existe um sorteio não contabilizado
+        }
+    }
 
     fun salvarResultadoSorteio(resultado: ResultadoSorteio) {
         _resultadoSorteio.value = resultado
@@ -58,7 +83,10 @@ class SorteioRepository @Inject constructor(
                 else -> time.jogadores.maxByOrNull { it.pontuacaoTotal }
             } ?: time.jogadores.firstOrNull()
 
-            val nomeTime = if (jogadorDestaque != null) {
+            // Para times reserva, usar o nome "Time Reserva", caso contrário usar o nome baseado no jogador
+            val nomeTime = if (time.ehTimeReserva) {
+                "Time Reserva"
+            } else if (jogadorDestaque != null) {
                 "Time do ${jogadorDestaque.nome}"
             } else {
                 "Time ${index + 1}"
@@ -69,7 +97,8 @@ class SorteioRepository @Inject constructor(
                 jogadoresIds = time.jogadores.map { it.id },
                 mediaEstrelas = mediaEstrelas,
                 mediaPontuacao = mediaPontuacao,
-                isUltimoPelada = true // Marca como último sorteio realizado
+                isUltimoPelada = true, // Marca como último sorteio realizado
+                ehTimeReserva = time.ehTimeReserva // Preserva a flag de time reserva
             )
         }
 
@@ -83,8 +112,11 @@ class SorteioRepository @Inject constructor(
                 historicoTimeDao.inserirHistoricoTime(historicoTime)
             }
 
-            // Reset da flag de sorteio não contabilizado
-            resetSorteioContabilizacao()
+            // Atualizamos a flag de pelada ativa
+            _temPeladaAtiva.value = true
+
+            // Mantemos a flag de sorteio não contabilizado
+            _temSorteioNaoContabilizado.value = true
         }
     }
 
@@ -115,6 +147,7 @@ class SorteioRepository @Inject constructor(
         // Primeiro limpamos a lista de times em memória
         _resultadoSorteio.value = null
         _temSorteioNaoContabilizado.value = false
+        _temPeladaAtiva.value = false
 
         try {
             // Precisamos coletar o Flow para obter a lista atual de times
@@ -127,6 +160,19 @@ class SorteioRepository @Inject constructor(
         } catch (e: Exception) {
             // Loga o erro ou trata de acordo com a necessidade
             e.printStackTrace()
+        }
+    }
+
+    // Método para cancelar uma pelada ativa
+    suspend fun cancelarPeladaAtiva() {
+        withContext(Dispatchers.IO) {
+            // Limpa a flag de última pelada para todos os times existentes
+            historicoTimeDao.limparUltimaPelada()
+
+            // Atualiza as flags em memória
+            _temPeladaAtiva.value = false
+            _temSorteioNaoContabilizado.value = false
+            _resultadoSorteio.value = null
         }
     }
 
@@ -179,5 +225,10 @@ class SorteioRepository @Inject constructor(
                 jogadorRepository.registrarEmpate(it.jogadoresIds, pontosPorEmpate)
             }
         }
+
+        // Após registrar o resultado, desativa a pelada atual
+        historicoTimeDao.limparUltimaPelada()
+        _temPeladaAtiva.value = false
+        _temSorteioNaoContabilizado.value = false
     }
 }

@@ -10,6 +10,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.victorhugo.boleiragem.ui.screens.cadastro.DetalheJogadorScreen
+import com.victorhugo.boleiragem.ui.screens.configuracao.GerenciadorPerfisScreen
+import com.victorhugo.boleiragem.ui.screens.estatisticas.EstatisticasScreen
 import com.victorhugo.boleiragem.ui.screens.sorteio.ResultadoSorteioScreen
 import com.victorhugo.boleiragem.ui.screens.splash.SplashScreen
 
@@ -79,6 +81,28 @@ fun BoleiragemNavHost(
         ) {
             ResultadoSorteioScreen(
                 onBackClick = {
+                    navController.navigateUp()
+                }
+            )
+        }
+
+        // Tela de gerenciamento de perfis de configuração (sem bottom navigation)
+        composable(
+            route = NavDestinations.GerenciadorPerfis.route
+        ) {
+            GerenciadorPerfisScreen(
+                onNavigateBack = {
+                    navController.navigateUp()
+                }
+            )
+        }
+
+        // Tela de estatísticas (sem bottom navigation)
+        composable(
+            route = NavDestinations.Estatisticas.route
+        ) {
+            EstatisticasScreen(
+                onNavigateBack = {
                     navController.navigateUp()
                 }
             )

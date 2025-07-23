@@ -46,7 +46,17 @@ class DetalheJogadorViewModel @Inject constructor(
 
     private var jogadorId: Long = 0
 
+    fun resetarSalvo() {
+        _salvo.value = false
+    }
+
     fun carregarJogador(id: Long) {
+        // Sempre resetamos o estado de salvo quando carregamos um jogador
+        resetarSalvo()
+
+        // Reset dos campos do formulário para evitar dados antigos
+        resetarFormulario()
+
         if (id <= 0) {
             // É um novo jogador
             _jogador.value = Jogador(
@@ -57,6 +67,7 @@ class DetalheJogadorViewModel @Inject constructor(
                 notaPosicaoPrincipal = 3,
                 notaPosicaoSecundaria = null
             )
+            jogadorId = 0
             return
         }
 
@@ -74,6 +85,15 @@ class DetalheJogadorViewModel @Inject constructor(
                 notaSecundaria = it.notaPosicaoSecundaria
             }
         }
+    }
+
+    private fun resetarFormulario() {
+        nome = ""
+        posicaoPrincipal = PosicaoJogador.MEIO_CAMPO
+        notaPrincipal = 3
+        possuiSecundaria = false
+        posicaoSecundaria = null
+        notaSecundaria = null
     }
 
     fun salvarJogador() {

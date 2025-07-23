@@ -22,21 +22,19 @@ class SorteioUseCase @Inject constructor() {
 
         // Verifica se temos jogadores suficientes para formar os times
         val totalJogadoresNecessarios = configuracao.qtdJogadoresPorTime * configuracao.qtdTimes
-        if (jogadoresAtivos.size < totalJogadoresNecessarios) {
-            // Não temos jogadores suficientes, ajusta a configuração
-            val novaQtdTimes = jogadoresAtivos.size / configuracao.qtdJogadoresPorTime
-            if (novaQtdTimes == 0) {
-                // Não temos jogadores suficientes nem para um time, ajusta jogadores por time
-                val jogadoresPorTime = jogadoresAtivos.size
-                return sortearTimesAjustado(jogadoresAtivos, jogadoresPorTime, 1, configuracao.aleatorio, configuracao.criteriosExtras)
-            }
-            return sortearTimesAjustado(jogadoresAtivos, configuracao.qtdJogadoresPorTime, novaQtdTimes, configuracao.aleatorio, configuracao.criteriosExtras)
+
+        // Se não tivermos jogadores suficientes para todos os times completos
+        if (jogadoresAtivos.size < configuracao.qtdTimes) {
+            // Não temos nem um jogador para cada time configurado
+            val novaQtdTimes = 1 // No mínimo um time
+            return sortearTimesComReservas(jogadoresAtivos, configuracao.qtdJogadoresPorTime, novaQtdTimes, configuracao.aleatorio, configuracao.criteriosExtras)
         }
 
-        return sortearTimesAjustado(jogadoresAtivos, configuracao.qtdJogadoresPorTime, configuracao.qtdTimes, configuracao.aleatorio, configuracao.criteriosExtras)
+        // Usamos o novo método que cria time reserva se necessário
+        return sortearTimesComReservas(jogadoresAtivos, configuracao.qtdJogadoresPorTime, configuracao.qtdTimes, configuracao.aleatorio, configuracao.criteriosExtras)
     }
 
-    private fun sortearTimesAjustado(
+    private fun sortearTimesComReservas(
         jogadoresAtivos: List<Jogador>,
         jogadoresPorTime: Int,
         qtdTimes: Int,
@@ -82,10 +80,72 @@ class SorteioUseCase @Inject constructor() {
             }
         }
 
-        // Distribuir jogadores em times (serpentina)
-        val times = distribuirJogadoresEmTimes(jogadoresOrdenados, jogadoresPorTime, qtdTimes)
+        // Nova lógica de distribuição de jogadores
+        // Vamos tentar completar o máximo de times possível com o número correto de jogadores
+        val timesCompletos = qtdTimes
+        val jogadoresEmTimesCompletos = timesCompletos * jogadoresPorTime
 
-        return ResultadoSorteio(times)
+        // Se temos jogadores suficientes para todos os times
+        if (jogadoresOrdenados.size >= jogadoresEmTimesCompletos) {
+            // Jogadores para times completos
+            val jogadoresParaTimesCompletos = jogadoresOrdenados.take(jogadoresEmTimesCompletos)
+            // Jogadores sobrando vão para o time reserva
+            val jogadoresReserva = jogadoresOrdenados.drop(jogadoresEmTimesCompletos)
+
+            // Distribuir jogadores nos times completos
+            val timesCompletos = distribuirJogadoresEmTimes(jogadoresParaTimesCompletos, jogadoresPorTime, timesCompletos)
+
+            // Se tivermos jogadores na reserva, criamos um time reserva
+            val todosOsTimes = if (jogadoresReserva.isNotEmpty()) {
+                val timeReserva = Time(
+                    id = timesCompletos.size, // ID do time reserva é o próximo após os times completos
+                    nome = "Time Reserva", // Nome fixo: "Time Reserva"
+                    jogadores = jogadoresReserva,
+                    ehTimeReserva = true // Marca como time reserva
+                )
+                timesCompletos + timeReserva
+            } else {
+                timesCompletos
+            }
+
+            return ResultadoSorteio(todosOsTimes)
+        } else {
+            // Não temos jogadores suficientes para todos os times completos
+            // Vamos criar times com o máximo de jogadores possível e um time reserva se necessário
+
+            // Calculamos quantos times completos podemos formar
+            val timesCompletosPodemSerFormados = jogadoresOrdenados.size / jogadoresPorTime
+
+            if (timesCompletosPodemSerFormados > 0) {
+                // Jogadores para os times completos
+                val jogadoresParaTimesCompletos = jogadoresOrdenados.take(timesCompletosPodemSerFormados * jogadoresPorTime)
+                // Jogadores restantes vão para o time reserva
+                val jogadoresReserva = jogadoresOrdenados.drop(timesCompletosPodemSerFormados * jogadoresPorTime)
+
+                // Distribuir jogadores nos times completos
+                val timesCompletos = distribuirJogadoresEmTimes(jogadoresParaTimesCompletos, jogadoresPorTime, timesCompletosPodemSerFormados)
+
+                // Criamos o time reserva com os jogadores restantes
+                val timeReserva = Time(
+                    id = timesCompletosPodemSerFormados,
+                    nome = "Time Reserva",
+                    jogadores = jogadoresReserva,
+                    ehTimeReserva = true // Marca como time reserva
+                )
+
+                return ResultadoSorteio(timesCompletos + timeReserva)
+            } else {
+                // Não conseguimos formar nem um time completo, todos os jogadores vão para o time reserva
+                val timeReserva = Time(
+                    id = 0,
+                    nome = "Time Reserva",
+                    jogadores = jogadoresOrdenados,
+                    ehTimeReserva = true // Marca como time reserva
+                )
+
+                return ResultadoSorteio(listOf(timeReserva))
+            }
+        }
     }
 
     private fun ordenarPorPontuacao(jogadores: List<Jogador>): List<Jogador> {

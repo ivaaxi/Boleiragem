@@ -2,6 +2,8 @@ package com.victorhugo.boleiragem.ui.screens.configuracao
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,7 +20,8 @@ fun CriteriosSorteioScreen(
     aleatorio: Boolean,
     criteriosExtras: Set<CriterioSorteio>,
     onAleatorioChange: (Boolean) -> Unit,
-    onCriterioExtraToggle: (CriterioSorteio) -> Unit
+    onCriterioExtraToggle: (CriterioSorteio) -> Unit,
+    onGerenciarPerfisClick: () -> Unit = {} // Nova função para navegação
 ) {
     // Box externo para controlar a largura do componente
     Box(
@@ -34,14 +37,39 @@ fun CriteriosSorteioScreen(
                 .fillMaxWidth(0.98f) // Preenche 98% da largura disponível
                 .padding(8.dp) // Padding interno reduzido
         ) {
-            // Título
-            Text(
-                text = "Critérios para Sorteio",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            // Cabeçalho com título e botão para gerenciamento de perfis
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Título
+                Text(
+                    text = "Critérios para Sorteio",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                // Botão para gerenciar perfis
+                IconButton(
+                    onClick = onGerenciarPerfisClick,
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Gerenciar Perfis",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Texto explicativo para o gerenciador de perfis
+            Text(
+                text = "Configure ou utilize diferentes perfis de sorteio",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
 
             // Critério Principal: Aleatório (Switch)
             Row(

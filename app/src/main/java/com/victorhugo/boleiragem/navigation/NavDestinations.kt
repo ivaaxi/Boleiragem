@@ -10,6 +10,7 @@ sealed class NavDestinations(val route: String) {
     object SorteioTimes : NavDestinations("sorteio_times")
     object TimesAtuais : NavDestinations("times_atuais")
     object Historico : NavDestinations("historico")
+    object Estatisticas : NavDestinations("estatisticas") // Nova rota para estatísticas
 
     // Outras rotas
     object DetalheJogador : NavDestinations("detalhe_jogador/{jogadorId}") {
@@ -17,4 +18,7 @@ sealed class NavDestinations(val route: String) {
     }
 
     object ResultadoSorteio : NavDestinations("resultado_sorteio")
+
+    // Nova rota para gerenciamento de perfis de configuração
+    object GerenciadorPerfis : NavDestinations("gerenciador_perfis")
 }

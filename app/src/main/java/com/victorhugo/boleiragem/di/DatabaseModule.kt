@@ -32,7 +32,10 @@ object DatabaseModule {
             BoleiragemDatabase.MIGRATION_2_3,
             BoleiragemDatabase.MIGRATION_3_4,
             BoleiragemDatabase.MIGRATION_4_5,
-            BoleiragemDatabase.MIGRATION_5_6
+            BoleiragemDatabase.MIGRATION_5_6,
+            BoleiragemDatabase.MIGRATION_6_7,
+            BoleiragemDatabase.MIGRATION_7_8,
+            BoleiragemDatabase.MIGRATION_8_9
         )
         .build()
     }

@@ -4,17 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.victorhugo.boleiragem.data.model.Jogador
 import com.victorhugo.boleiragem.data.model.Time
+import com.victorhugo.boleiragem.data.repository.JogadorRepository
 import com.victorhugo.boleiragem.data.repository.SorteioRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ResultadoSorteioViewModel @Inject constructor(
-    private val sorteioRepository: SorteioRepository
+    private val sorteioRepository: SorteioRepository,
+    private val jogadorRepository: JogadorRepository
 ) : ViewModel() {
 
     // Agora pegamos o resultado diretamente do repositório compartilhado
@@ -35,8 +38,8 @@ class ResultadoSorteioViewModel @Inject constructor(
     init {
         // Verificar se existe pelada em andamento
         viewModelScope.launch {
-            sorteioRepository.getTimesUltimaPelada().collect { times ->
-                _peladaEmAndamento.value = times.isNotEmpty()
+            sorteioRepository.temPeladaAtiva.collect { temPelada ->
+                _peladaEmAndamento.value = temPelada
             }
         }
     }
@@ -56,19 +59,34 @@ class ResultadoSorteioViewModel @Inject constructor(
     // Verificar se todos os times têm capitães definidos
     private fun verificarTodosCapitaesDefinidos() {
         val resultado = resultadoSorteio.value ?: return
-        _todosCapitaesDefinidos.value = resultado.times.size == _capitaesSelecionados.value.size
+
+        // Conta quantos times precisam de capitão (exclui o Time Reserva)
+        val timesQueNecessitamCapitao = resultado.times.count { time -> time.nome != "Time Reserva" }
+
+        // Conta quantos capitães já foram selecionados
+        val capitaesSelecionados = _capitaesSelecionados.value.size
+
+        // Todos os times estão definidos se todos que precisam de capitão têm um selecionado
+        _todosCapitaesDefinidos.value = timesQueNecessitamCapitao == capitaesSelecionados
     }
 
     // Método para cancelar o sorteio atual
     fun cancelarSorteio() {
-        // Limpa o resultado do sorteio
-        sorteioRepository.limparResultado()
-        // Reseta o estado de sorteio em andamento para resolver o problema de loading infinito
-        sorteioRepository.setSorteioEmAndamento(false)
-        // Reseta o estado de sorteio não contabilizado
-        sorteioRepository.resetSorteioContabilizacao()
-        // Limpar os capitães selecionados
-        _capitaesSelecionados.value = emptyMap()
+        viewModelScope.launch {
+            // Se houver uma pelada ativa, cancelamos ela
+            if (_peladaEmAndamento.value) {
+                sorteioRepository.cancelarPeladaAtiva()
+            }
+
+            // Limpa o resultado do sorteio
+            sorteioRepository.limparResultado()
+            // Reseta o estado de sorteio em andamento para resolver o problema de loading infinito
+            sorteioRepository.setSorteioEmAndamento(false)
+            // Reseta o estado de sorteio não contabilizado
+            sorteioRepository.resetSorteioContabilizacao()
+            // Limpar os capitães selecionados
+            _capitaesSelecionados.value = emptyMap()
+        }
     }
 
     // Método para confirmar o sorteio
@@ -85,11 +103,46 @@ class ResultadoSorteioViewModel @Inject constructor(
                 time.copy(nome = novoNome)
             }
 
-            // Salvar os times com os novos nomes
-            sorteioRepository.salvarTimesNoBancoDeDados(resultado.copy(times = timesAtualizados))
+            // Se houver uma pelada ativa, cancelamos ela antes de salvar a nova
+            viewModelScope.launch {
+                if (_peladaEmAndamento.value) {
+                    sorteioRepository.cancelarPeladaAtiva()
+                }
+
+                // Salvar os times com os novos nomes
+                sorteioRepository.salvarTimesNoBancoDeDados(resultado.copy(times = timesAtualizados))
+
+                // Atualizar a disponibilidade dos jogadores
+                atualizarDisponibilidadeJogadores(resultado.times)
+            }
         }
         // Reseta o estado de sorteio em andamento
         sorteioRepository.setSorteioEmAndamento(false)
+    }
+
+    // Função para atualizar a disponibilidade dos jogadores com base no resultado do sorteio
+    private fun atualizarDisponibilidadeJogadores(times: List<Time>) {
+        viewModelScope.launch {
+            // Coletamos todos os jogadores que participaram do sorteio
+            val jogadoresSorteio = mutableSetOf<Long>()
+            times.forEach { time ->
+                time.jogadores.forEach { jogador ->
+                    jogadoresSorteio.add(jogador.id)
+                }
+            }
+
+            // Atualizamos o status de disponibilidade de todos os jogadores
+            val todosJogadores = jogadorRepository.getJogadores().first()
+            todosJogadores.forEach { jogador ->
+                // Se o jogador está no sorteio, ele está disponível
+                val disponivel = jogadoresSorteio.contains(jogador.id)
+
+                // Só atualizamos se o status mudou, para evitar operações desnecessárias
+                if (jogador.disponivel != disponivel) {
+                    jogadorRepository.atualizarJogador(jogador.copy(disponivel = disponivel))
+                }
+            }
+        }
     }
 
     fun compartilharResultado() {

@@ -18,7 +18,8 @@ data class HistoricoTime(
     val jogadoresIds: List<Long> = emptyList(),
     val mediaEstrelas: Float = 0f,
     val mediaPontuacao: Float = 0f,
-    val isUltimoPelada: Boolean = false
+    val isUltimoPelada: Boolean = false,
+    val ehTimeReserva: Boolean = false
 )
 
 data class HistoricoSorteio(

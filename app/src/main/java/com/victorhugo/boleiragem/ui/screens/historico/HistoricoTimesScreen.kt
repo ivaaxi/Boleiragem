@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.victorhugo.boleiragem.data.model.HistoricoTime
+import com.victorhugo.boleiragem.ui.screens.estatisticas.EstatisticaItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,8 +75,8 @@ fun HistoricoTimesScreen(
             text = {
                 Text(
                     "Tem certeza que deseja finalizar a pelada? " +
-                    "As estatísticas dos jogadores serão atualizadas com os resultados atuais " +
-                    "e você não poderá mais editar os resultados desse sorteio."
+                            "As estatísticas dos jogadores serão atualizadas com os resultados atuais " +
+                            "e você não poderá mais editar os resultados desse sorteio."
                 )
             },
             confirmButton = {
@@ -106,7 +107,7 @@ fun HistoricoTimesScreen(
             text = {
                 Text(
                     "Tem certeza que deseja apagar esta pelada? " +
-                    "Todos os times e resultados serão perdidos e não poderão ser recuperados."
+                            "Todos os times e resultados serão perdidos e não poderão ser recuperados."
                 )
             },
             confirmButton = {
@@ -246,7 +247,8 @@ fun TimeHistoricoCard(
     onEmpateClick: () -> Unit,
     onDiminuirVitoriaClick: () -> Unit = {},
     onDiminuirDerrotaClick: () -> Unit = {},
-    onDiminuirEmpateClick: () -> Unit = {}
+    onDiminuirEmpateClick: () -> Unit = {},
+    onSubstituicaoClick: () -> Unit = {} // Novo parâmetro para substituição
 ) {
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
     val dataFormatada = remember(time.dataUltimoSorteio) {
@@ -313,196 +315,240 @@ fun TimeHistoricoCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Estatísticas do time
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                EstatisticaItem(
-                    label = "Vitórias",
-                    valor = time.vitorias,
-                    color = Color(0xFF4CAF50)
-                )
-
-                EstatisticaItem(
-                    label = "Empates",
-                    valor = time.empates,
-                    color = Color(0xFFFFC107)
-                )
-
-                EstatisticaItem(
-                    label = "Derrotas",
-                    valor = time.derrotas,
-                    color = Color(0xFFF44336)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Botões para registrar resultado - agora em pares (adicionar/diminuir)
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Vitória
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Verifica se é time reserva para exibir conteúdo diferente
+            if (time.ehTimeReserva) {
+                // Para times reserva, mostra apenas informação e botão de substituição
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedButton(
-                        onClick = onVitoriaClick,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF4CAF50)
-                        ),
-                        modifier = Modifier.weight(1f)
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Adicionar vitória"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Vitória",
-                            maxLines = 1,
-                            textAlign = TextAlign.Center
+                            text = "Time de Reserva",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
-                    }
-
-                    OutlinedButton(
-                        onClick = onDiminuirVitoriaClick,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF4CAF50)
-                        ),
-                        enabled = time.vitorias > 0,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Remove,
-                            contentDescription = "Diminuir vitória"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Vitória",
-                            maxLines = 1,
-                            textAlign = TextAlign.Center
+                            text = "Este time não disputa jogos",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     }
                 }
 
-                // Empate
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Botão de substituição para time reserva
+                Button(
+                    onClick = onSubstituicaoClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Substituição"
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("SUBSTITUIÇÃO")
+                }
+            } else {
+                // Para times normais, mostra estatísticas e botões de resultado
+                // Estatísticas do time
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    OutlinedButton(
-                        onClick = onEmpateClick,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFFFC107)
-                        ),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Adicionar empate"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Empate",
-                            maxLines = 1,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    EstatisticaItem(
+                        titulo = "Vitórias",
+                        valor = time.vitorias.toString()
+                    )
 
-                    OutlinedButton(
-                        onClick = onDiminuirEmpateClick,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFFFC107)
-                        ),
-                        enabled = time.empates > 0,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Remove,
-                            contentDescription = "Diminuir empate"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Empate",
-                            maxLines = 1,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    EstatisticaItem(
+                        titulo = "Empates",
+                        valor = time.empates.toString(),
+                    )
+
+                    EstatisticaItem(
+                        titulo = "Derrotas",
+                        valor = time.derrotas.toString(),
+                    )
                 }
 
-                // Derrota
-                Row(
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Botões para registrar resultado - agora em pares (adicionar/diminuir)
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onDerrotaClick,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFF44336)
-                        ),
-                        modifier = Modifier.weight(1f)
+                    // Vitória
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Adicionar derrota"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Derrota",
-                            maxLines = 1,
-                            textAlign = TextAlign.Center
-                        )
+                        OutlinedButton(
+                            onClick = onVitoriaClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFF4CAF50)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Adicionar vitória"
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Vitória",
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onDiminuirVitoriaClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFF4CAF50)
+                            ),
+                            enabled = time.vitorias > 0,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "Diminuir vitória"
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Vitória",
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = onDiminuirDerrotaClick,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFF44336)
-                        ),
-                        enabled = time.derrotas > 0,
-                        modifier = Modifier.weight(1f)
+                    // Empate
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Remove,
-                            contentDescription = "Diminuir derrota"
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Derrota",
-                            maxLines = 1,
-                            textAlign = TextAlign.Center
-                        )
+                        OutlinedButton(
+                            onClick = onEmpateClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFFFFC107)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Adicionar empate"
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Empate",
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onDiminuirEmpateClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFFFFC107)
+                            ),
+                            enabled = time.empates > 0,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "Diminuir empate"
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Empate",
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    // Derrota
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onDerrotaClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFFF44336)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Adicionar derrota"
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Derrota",
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onDiminuirDerrotaClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFFF44336)
+                            ),
+                            enabled = time.derrotas > 0,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "Diminuir derrota"
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Derrota",
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
         }
     }
-}
 
-@Composable
-fun EstatisticaItem(
-    label: String,
-    valor: Int,
-    color: Color
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
+    @Composable
+    fun EstatisticaItem(
+        label: String,
+        valor: Int,
+        color: Color
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-        Text(
-            text = valor.toString(),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
+            Text(
+                text = valor.toString(),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+        }
     }
 }
+

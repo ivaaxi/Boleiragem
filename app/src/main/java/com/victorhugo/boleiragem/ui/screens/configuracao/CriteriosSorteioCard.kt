@@ -1,5 +1,6 @@
 package com.victorhugo.boleiragem.ui.screens.configuracao
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
@@ -18,7 +19,8 @@ fun CriteriosSorteioCard(
     aleatorio: Boolean,
     criteriosExtras: Set<CriterioSorteio>,
     onAleatorioChange: (Boolean) -> Unit,
-    onCriterioExtraToggle: (CriterioSorteio) -> Unit
+    onCriterioExtraToggle: (CriterioSorteio) -> Unit,
+    onGerenciarPerfisClick: () -> Unit = {} // Mantém o parâmetro por compatibilidade, mas não usa mais
 ) {
     Card(
         modifier = Modifier.fillMaxWidth() // Removido o padding externo para igualar ao outro card
@@ -28,27 +30,27 @@ fun CriteriosSorteioCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Título
+            // Cabeçalho apenas com título, sem o botão de engrenagem
             Text(
                 text = "Critérios para Sorteio",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Critério Principal: Aleatório (Switch)
+            // Critério Principal: Aleatório (Switch) - Tornando toda a área clicável
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { onAleatorioChange(!aleatorio) } // Tornando toda a Row clicável
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Switch(
                     checked = aleatorio,
-                    onCheckedChange = { onAleatorioChange(it) }
+                    onCheckedChange = { onAleatorioChange(it) },
+                    modifier = Modifier.padding(end = 8.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
                         text = "Sorteio Aleatório",

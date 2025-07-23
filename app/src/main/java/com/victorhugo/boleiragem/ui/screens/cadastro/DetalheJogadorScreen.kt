@@ -23,13 +23,21 @@ fun DetalheJogadorScreen(
     val jogadorState = viewModel.jogador.collectAsState(null)
     val salvoState = viewModel.salvo.collectAsState()
 
+    // Resetar o estado de salvo quando a composição entra
+    DisposableEffect(Unit) {
+        viewModel.resetarSalvo()
+        onDispose { }
+    }
+
     LaunchedEffect(jogadorId) {
         viewModel.carregarJogador(jogadorId)
     }
 
     LaunchedEffect(salvoState.value) {
         if (salvoState.value) {
+            // Só fecha a tela se o jogador foi realmente salvo
             onBackClick()
+            viewModel.resetarSalvo() // Garante que o estado seja resetado após navegar de volta
         }
     }
 
