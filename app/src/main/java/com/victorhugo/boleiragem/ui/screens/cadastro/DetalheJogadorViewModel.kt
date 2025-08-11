@@ -25,6 +25,9 @@ class DetalheJogadorViewModel @Inject constructor(
     private val _salvo = MutableStateFlow(false)
     val salvo: StateFlow<Boolean> = _salvo
 
+    // ID do grupo atual (pelada) - obrigatório para criar/editar jogadores
+    private var grupoId: Long = 0
+
     // Estados para formulário
     var nome by mutableStateOf("")
         internal set
@@ -46,6 +49,13 @@ class DetalheJogadorViewModel @Inject constructor(
 
     private var jogadorId: Long = 0
 
+    /**
+     * Define qual pelada/grupo o jogador pertence
+     */
+    fun setGrupoId(grupoId: Long) {
+        this.grupoId = grupoId
+    }
+
     fun resetarSalvo() {
         _salvo.value = false
     }
@@ -58,9 +68,14 @@ class DetalheJogadorViewModel @Inject constructor(
         resetarFormulario()
 
         if (id <= 0) {
-            // É um novo jogador
+            // É um novo jogador - precisa do grupoId válido
+            if (grupoId <= 0) {
+                throw IllegalStateException("Grupo ID não definido. Chame setGrupoId() primeiro.")
+            }
+
             _jogador.value = Jogador(
                 id = 0,
+                grupoId = grupoId, // Incluindo grupoId para novos jogadores
                 nome = "",
                 posicaoPrincipal = PosicaoJogador.MEIO_CAMPO,
                 posicaoSecundaria = null,
@@ -83,6 +98,8 @@ class DetalheJogadorViewModel @Inject constructor(
                 possuiSecundaria = it.posicaoSecundaria != null
                 posicaoSecundaria = it.posicaoSecundaria
                 notaSecundaria = it.notaPosicaoSecundaria
+                // Atualizar o grupoId com o do jogador carregado
+                grupoId = it.grupoId
             }
         }
     }
@@ -102,6 +119,10 @@ class DetalheJogadorViewModel @Inject constructor(
             return  // Não salva se o nome estiver em branco
         }
 
+        if (grupoId <= 0) {
+            throw IllegalStateException("Grupo ID não definido. Chame setGrupoId() primeiro.")
+        }
+
         // Se possuiSecundaria for false, garantimos que os valores secundários sejam null
         val posSecundaria = if (possuiSecundaria) posicaoSecundaria else null
         val notaSecund = if (possuiSecundaria && posicaoSecundaria != null) notaSecundaria else null
@@ -116,6 +137,7 @@ class DetalheJogadorViewModel @Inject constructor(
             )
         } else {
             Jogador(
+                grupoId = grupoId, // Agora incluindo o grupoId obrigatório
                 nome = nome,
                 posicaoPrincipal = posicaoPrincipal,
                 posicaoSecundaria = posSecundaria,

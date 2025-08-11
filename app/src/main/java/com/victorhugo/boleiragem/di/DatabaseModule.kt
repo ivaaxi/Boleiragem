@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoDao
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoPontuacaoDao
+import com.victorhugo.boleiragem.data.dao.GrupoPeladaDao
 import com.victorhugo.boleiragem.data.dao.HistoricoPeladaDao
 import com.victorhugo.boleiragem.data.dao.HistoricoTimeDao
 import com.victorhugo.boleiragem.data.dao.JogadorDao
@@ -35,7 +36,11 @@ object DatabaseModule {
             BoleiragemDatabase.MIGRATION_5_6,
             BoleiragemDatabase.MIGRATION_6_7,
             BoleiragemDatabase.MIGRATION_7_8,
-            BoleiragemDatabase.MIGRATION_8_9
+            BoleiragemDatabase.MIGRATION_8_9,
+            BoleiragemDatabase.MIGRATION_9_10,
+            BoleiragemDatabase.MIGRATION_10_11,
+            BoleiragemDatabase.MIGRATION_11_12, // Adicionando a migração para diasSemana
+            BoleiragemDatabase.MIGRATION_12_13 // Nova migração para grupoId
         )
         .build()
     }
@@ -63,5 +68,10 @@ object DatabaseModule {
     @Provides
     fun provideHistoricoPeladaDao(database: BoleiragemDatabase): HistoricoPeladaDao {
         return database.historicoPeladaDao()
+    }
+
+    @Provides
+    fun provideGrupoPeladaDao(database: BoleiragemDatabase): GrupoPeladaDao {
+        return database.grupoPeladaDao()
     }
 }

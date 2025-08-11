@@ -15,6 +15,7 @@ enum class PosicaoJogador(val sigla: String) {
 data class Jogador(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val grupoId: Long, // Campo obrigatório para vincular jogador à pelada específica
     val nome: String,
     val posicaoPrincipal: PosicaoJogador,
     val posicaoSecundaria: PosicaoJogador?,

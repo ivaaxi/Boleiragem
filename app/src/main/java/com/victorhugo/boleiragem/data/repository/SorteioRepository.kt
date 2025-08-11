@@ -36,6 +36,10 @@ class SorteioRepository @Inject constructor(
     private val _temPeladaAtiva = MutableStateFlow(false)
     val temPeladaAtiva: StateFlow<Boolean> = _temPeladaAtiva.asStateFlow()
 
+    // Novo StateFlow para o resultado do sorteio rápido
+    private val _resultadoSorteioRapido = MutableStateFlow<ResultadoSorteio?>(null)
+    val resultadoSorteioRapido: StateFlow<ResultadoSorteio?> = _resultadoSorteioRapido.asStateFlow()
+
     init {
         // Verifica se existe uma pelada ativa ao inicializar o repositório
         scope.launch {
@@ -66,7 +70,7 @@ class SorteioRepository @Inject constructor(
 
     // Método para efetivamente salvar os times no banco de dados após confirmação do usuário
     fun salvarTimesNoBancoDeDados(resultado: ResultadoSorteio) {
-        val historicoTimes = resultado.times.mapIndexed { index, time ->
+        val historicoTimes = resultado.times.map { time ->
             // Calcular a média de estrelas do time
             val mediaEstrelas = time.jogadores.map { jogador ->
                 jogador.notaPosicaoPrincipal.toFloat()
@@ -77,23 +81,8 @@ class SorteioRepository @Inject constructor(
                 jogador.pontuacaoTotal.toFloat()
             }.average().toFloat()
 
-            // Encontrar o jogador com maior pontuação ou estrelas para nomear o time
-            val jogadorDestaque = when (resultado.tipoDeSorteio) {
-                "Estrelas" -> time.jogadores.maxByOrNull { it.notaPosicaoPrincipal }
-                else -> time.jogadores.maxByOrNull { it.pontuacaoTotal }
-            } ?: time.jogadores.firstOrNull()
-
-            // Para times reserva, usar o nome "Time Reserva", caso contrário usar o nome baseado no jogador
-            val nomeTime = if (time.ehTimeReserva) {
-                "Time Reserva"
-            } else if (jogadorDestaque != null) {
-                "Time do ${jogadorDestaque.nome}"
-            } else {
-                "Time ${index + 1}"
-            }
-
             HistoricoTime(
-                nome = nomeTime,
+                nome = time.nome, // Usa o nome já definido no objeto time (com o capitão escolhido)
                 jogadoresIds = time.jogadores.map { it.id },
                 mediaEstrelas = mediaEstrelas,
                 mediaPontuacao = mediaPontuacao,
@@ -230,5 +219,21 @@ class SorteioRepository @Inject constructor(
         historicoTimeDao.limparUltimaPelada()
         _temPeladaAtiva.value = false
         _temSorteioNaoContabilizado.value = false
+    }
+
+    fun salvarResultadoSorteioRapido(resultado: ResultadoSorteio) {
+        _resultadoSorteioRapido.value = resultado
+        // Não marcamos como pelada ativa ou não contabilizada,
+        // pois é apenas um sorteio temporário
+        _sorteioEmAndamento.value = false
+    }
+
+    fun limparResultadoSorteioRapido() {
+        _resultadoSorteioRapido.value = null
+    }
+
+    // Método para verificar se existe um sorteio rápido
+    fun temSorteioRapido(): Boolean {
+        return _resultadoSorteioRapido.value != null
     }
 }

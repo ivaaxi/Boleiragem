@@ -1,7 +1,5 @@
 package com.victorhugo.boleiragem.navigation
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -28,19 +26,7 @@ fun BoleiragemNavHost(
     ) {
         // SplashScreen - Temporário até a navegação para o Home
         composable(
-            route = NavDestinations.Splash.route,
-            enterTransition = {
-                slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Companion.Left,
-                    animationSpec = tween(700)
-                )
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Companion.Left,
-                    animationSpec = tween(700)
-                )
-            }
+            route = NavDestinations.Splash.route
         ) {
             SplashScreen(onNavigateToHome = {
                 navController.navigate(NavDestinations.CadastroJogadores.route) {

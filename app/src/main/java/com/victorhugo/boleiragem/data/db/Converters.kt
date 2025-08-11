@@ -44,10 +44,12 @@ class Converters {
 
     @TypeConverter
     fun toLongList(data: String): List<Long> {
-        return if (data.isEmpty()) {
+        return if (data.isEmpty() || data == "[]") {
             emptyList()
         } else {
-            data.split(",").map { it.toLong() }
+            data.split(",")
+                .filter { it.isNotEmpty() && it != "[]" }
+                .map { it.toLong() }
         }
     }
 
@@ -60,5 +62,22 @@ class Converters {
     fun toHistoricoTimeSnapshotList(value: String): List<HistoricoTimeSnapshot> {
         val listType = object : TypeToken<List<HistoricoTimeSnapshot>>() {}.type
         return gson.fromJson(value, listType) ?: emptyList()
+    }
+
+    // Conversores para DiaSemana
+    @TypeConverter
+    fun fromDiaSemanaList(diasSemana: List<com.victorhugo.boleiragem.data.model.DiaSemana>): String {
+        return diasSemana.joinToString(",") { it.name }
+    }
+
+    @TypeConverter
+    fun toDiaSemanaList(diasSemanaString: String): List<com.victorhugo.boleiragem.data.model.DiaSemana> {
+        return if (diasSemanaString.isEmpty() || diasSemanaString == "[]") {
+            emptyList()
+        } else {
+            diasSemanaString.split(",")
+                .filter { it.isNotEmpty() && it != "[]" }
+                .map { com.victorhugo.boleiragem.data.model.DiaSemana.valueOf(it.trim()) }
+        }
     }
 }

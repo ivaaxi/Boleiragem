@@ -148,6 +148,97 @@ class SorteioUseCase @Inject constructor() {
         }
     }
 
+    fun sortearTimesRapido(
+        jogadores: List<Jogador>,
+        configuracao: ConfiguracaoSorteio,
+        numeroTimes: Int
+    ): ResultadoSorteio {
+        if (jogadores.isEmpty()) {
+            return ResultadoSorteio(emptyList())
+        }
+
+        // Determina a quantidade de jogadores por time baseado no total de jogadores e número de times
+        val jogadoresPorTime = jogadores.size / numeroTimes
+        val jogadoresSobrando = jogadores.size % numeroTimes
+
+        // Ordenar jogadores conforme critérios
+        val jogadoresOrdenados = if (configuracao.aleatorio) {
+            // Se aleatório está ativado, ignora outros critérios
+            jogadores.shuffled()
+        } else {
+            // Aplica critérios de ordenação
+            aplicarCriteriosOrdenacao(jogadores, configuracao.criteriosExtras)
+        }
+
+        // Cria os times vazios
+        val times = List(numeroTimes) { index ->
+            Time(
+                id = index,
+                nome = "Time ${index + 1}",
+                jogadores = ArrayList()
+            )
+        }.toMutableList()
+
+        // Distribui jogadores em times usando método de serpentina
+        var direcaoCrescente = true
+        var timeIndex = 0
+
+        jogadoresOrdenados.forEach { jogador ->
+            // Obter lista atual de jogadores
+            val jogadoresAtuais = ArrayList(times[timeIndex].jogadores)
+            // Adicionar o novo jogador
+            jogadoresAtuais.add(jogador)
+            // Atualizar o time com a nova lista de jogadores
+            times[timeIndex] = times[timeIndex].copy(jogadores = jogadoresAtuais)
+
+            // Determina o próximo time para distribuir (método serpentina)
+            if (direcaoCrescente) {
+                timeIndex++
+                if (timeIndex >= numeroTimes) {
+                    timeIndex = numeroTimes - 2
+                    direcaoCrescente = false
+                }
+            } else {
+                timeIndex--
+                if (timeIndex < 0) {
+                    timeIndex = 1
+                    direcaoCrescente = true
+                }
+            }
+        }
+
+        return ResultadoSorteio(times)
+    }
+
+    // Método auxiliar para aplicar critérios de ordenação
+    private fun aplicarCriteriosOrdenacao(
+        jogadores: List<Jogador>,
+        criteriosExtras: Set<CriterioSorteio>
+    ): List<Jogador> {
+        return when {
+            criteriosExtras.contains(CriterioSorteio.PONTUACAO) -> {
+                val jogadoresPorPontuacao = ordenarPorPontuacao(jogadores)
+
+                when {
+                    criteriosExtras.contains(CriterioSorteio.POSICAO) &&
+                    criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
+                        ordenarPorPosicaoEMedia(jogadoresPorPontuacao)
+                    criteriosExtras.contains(CriterioSorteio.POSICAO) ->
+                        ordenarPorPosicao(jogadoresPorPontuacao)
+                    criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
+                        ordenarPorMedia(jogadoresPorPontuacao)
+                    else -> jogadoresPorPontuacao
+                }
+            }
+            criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
+                ordenarPorMedia(jogadores)
+            criteriosExtras.contains(CriterioSorteio.POSICAO) ->
+                ordenarPorPosicao(jogadores)
+            // Caso nenhum critério esteja selecionado (não deveria acontecer, mas como fallback)
+            else -> jogadores.shuffled()
+        }
+    }
+
     private fun ordenarPorPontuacao(jogadores: List<Jogador>): List<Jogador> {
         // Ordena jogadores pela pontuação total (do maior para o menor)
         return jogadores.sortedByDescending { it.pontuacaoTotal }

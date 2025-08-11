@@ -7,14 +7,19 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoDao
 import com.victorhugo.boleiragem.data.dao.ConfiguracaoPontuacaoDao
+import com.victorhugo.boleiragem.data.dao.GrupoPeladaDao
 import com.victorhugo.boleiragem.data.dao.HistoricoPeladaDao
 import com.victorhugo.boleiragem.data.dao.HistoricoTimeDao
 import com.victorhugo.boleiragem.data.dao.JogadorDao
 import com.victorhugo.boleiragem.data.model.ConfiguracaoPontuacao
 import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
+import com.victorhugo.boleiragem.data.model.GrupoPelada
 import com.victorhugo.boleiragem.data.model.HistoricoPelada
 import com.victorhugo.boleiragem.data.model.HistoricoTime
 import com.victorhugo.boleiragem.data.model.Jogador
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Database(
     entities = [
@@ -22,9 +27,10 @@ import com.victorhugo.boleiragem.data.model.Jogador
         ConfiguracaoSorteio::class,
         HistoricoTime::class,
         ConfiguracaoPontuacao::class,
-        HistoricoPelada::class
+        HistoricoPelada::class,
+        GrupoPelada::class
     ],
-    version = 9, // Incrementado de 8 para 9
+    version = 13, // Incrementado de 12 para 13 para a nova migração do grupoId
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -34,6 +40,7 @@ abstract class BoleiragemDatabase : RoomDatabase() {
     abstract fun historicoTimeDao(): HistoricoTimeDao
     abstract fun configuracaoPontuacaoDao(): ConfiguracaoPontuacaoDao
     abstract fun historicoPeladaDao(): HistoricoPeladaDao
+    abstract fun grupoPeladaDao(): GrupoPeladaDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -161,6 +168,330 @@ abstract class BoleiragemDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 // Adicionar a coluna ehTimeReserva à tabela historico_time com valor padrão 0 (false)
                 database.execSQL("ALTER TABLE `historico_time` ADD COLUMN `ehTimeReserva` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Criar a tabela grupo_pelada
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `grupo_pelada` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `nome` TEXT NOT NULL,
+                        `local` TEXT NOT NULL,
+                        `horario` TEXT NOT NULL,
+                        `dataCriacao` INTEGER NOT NULL,
+                        `ultimaModificacao` INTEGER NOT NULL,
+                        `imagemUrl` TEXT,
+                        `descricao` TEXT,
+                        `ativo` INTEGER NOT NULL,
+                        `jogadoresIds` TEXT NOT NULL,
+                        `usuarioId` TEXT NOT NULL,
+                        `compartilhado` INTEGER NOT NULL
+                    )
+                    """
+                )
+
+                // Inserir um grupo padrão para manter compatibilidade com dados existentes
+                val dataHora = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).format(Date())
+                database.execSQL(
+                    """
+                    INSERT INTO `grupo_pelada` (
+                        `nome`, `local`, `horario`, `dataCriacao`, `ultimaModificacao`, 
+                        `ativo`, `jogadoresIds`, `usuarioId`, `compartilhado`
+                    )
+                    VALUES (
+                        'Pelada Principal', 'Quadra Local', '$dataHora', 
+                        ${System.currentTimeMillis()}, ${System.currentTimeMillis()}, 
+                        1, '[]', 'local', 0
+                    )
+                    """
+                )
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Verificar se a coluna tipoRecorrencia já existe
+                val cursor = database.query("PRAGMA table_info(grupo_pelada)")
+                val columnNames = mutableListOf<String>()
+                while (cursor.moveToNext()) {
+                    val nameIndex = cursor.getColumnIndex("name")
+                    if (nameIndex != -1) {
+                        val columnName = cursor.getString(nameIndex)
+                        columnNames.add(columnName)
+                    }
+                }
+                cursor.close()
+
+                // 1. Criar uma tabela temporária com a estrutura correta, usando TEXT para os enums
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `grupo_pelada_temp` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `nome` TEXT NOT NULL,
+                        `local` TEXT NOT NULL,
+                        `horario` TEXT NOT NULL,
+                        `dataCriacao` INTEGER NOT NULL,
+                        `ultimaModificacao` INTEGER NOT NULL,
+                        `imagemUrl` TEXT,
+                        `descricao` TEXT,
+                        `ativo` INTEGER NOT NULL,
+                        `jogadoresIds` TEXT NOT NULL,
+                        `usuarioId` TEXT NOT NULL,
+                        `compartilhado` INTEGER NOT NULL,
+                        `tipoRecorrencia` TEXT NOT NULL DEFAULT 'ESPORADICA',
+                        `diaSemana` TEXT,
+                        `latitude` REAL,
+                        `longitude` REAL,
+                        `endereco` TEXT,
+                        `localNome` TEXT
+                    )
+                    """
+                )
+
+                // 2. Copiar os dados da tabela antiga para a nova
+                if (columnNames.contains("tipoRecorrencia") && columnNames.contains("diaSemana")) {
+                    // Se as colunas já existem, fazemos a cópia adequada
+                    if (columnNames.contains("tipoRecorrencia") && isColumnType(database, "grupo_pelada", "tipoRecorrencia", "INTEGER")) {
+                        // Se tipoRecorrencia já existe como INTEGER, convertemos para TEXT
+                        database.execSQL(
+                            """
+                            INSERT INTO grupo_pelada_temp (
+                                id, nome, local, horario, dataCriacao, ultimaModificacao,
+                                imagemUrl, descricao, ativo, jogadoresIds, usuarioId, compartilhado,
+                                tipoRecorrencia, diaSemana, latitude, longitude, endereco, localNome
+                            )
+                            SELECT
+                                id, nome, local, horario, dataCriacao, ultimaModificacao,
+                                imagemUrl, descricao, ativo, jogadoresIds, usuarioId, compartilhado,
+                                CASE
+                                    WHEN tipoRecorrencia = 0 THEN 'ESPORADICA'
+                                    WHEN tipoRecorrencia = 1 THEN 'RECORRENTE'
+                                    ELSE 'ESPORADICA'
+                                END,
+                                CASE
+                                    WHEN diaSemana = 0 THEN 'DOMINGO'
+                                    WHEN diaSemana = 1 THEN 'SEGUNDA'
+                                    WHEN diaSemana = 2 THEN 'TERCA'
+                                    WHEN diaSemana = 3 THEN 'QUARTA'
+                                    WHEN diaSemana = 4 THEN 'QUINTA'
+                                    WHEN diaSemana = 5 THEN 'SEXTA'
+                                    WHEN diaSemana = 6 THEN 'SABADO'
+                                    ELSE NULL
+                                END,
+                                latitude, longitude, endereco, localNome
+                            FROM grupo_pelada
+                            """
+                        )
+                    } else {
+                        // Se tipoRecorrencia já existe como TEXT, apenas copiamos
+                        database.execSQL(
+                            """
+                            INSERT INTO grupo_pelada_temp 
+                            SELECT * FROM grupo_pelada
+                            """
+                        )
+                    }
+                } else {
+                    // Se as colunas não existem, usamos valores padrão
+                    database.execSQL(
+                        """
+                        INSERT INTO grupo_pelada_temp (
+                            id, nome, local, horario, dataCriacao, ultimaModificacao,
+                            imagemUrl, descricao, ativo, jogadoresIds, usuarioId, compartilhado,
+                            tipoRecorrencia, diaSemana, latitude, longitude, endereco, localNome
+                        )
+                        SELECT
+                            id, nome, local, horario, dataCriacao, ultimaModificacao,
+                            imagemUrl, descricao, ativo, jogadoresIds, usuarioId, compartilhado,
+                            'ESPORADICA', NULL, NULL, NULL, NULL, NULL
+                        FROM grupo_pelada
+                        """
+                    )
+                }
+
+                // 3. Apagar a tabela antiga
+                database.execSQL("DROP TABLE grupo_pelada")
+
+                // 4. Renomear a tabela temporária
+                database.execSQL("ALTER TABLE grupo_pelada_temp RENAME TO grupo_pelada")
+            }
+
+            // Função auxiliar para verificar o tipo de uma coluna
+            private fun isColumnType(database: SupportSQLiteDatabase, tableName: String, columnName: String, expectedType: String): Boolean {
+                val cursor = database.query("PRAGMA table_info($tableName)")
+                while (cursor.moveToNext()) {
+                    val nameIndex = cursor.getColumnIndex("name")
+                    if (nameIndex != -1) {
+                        val name = cursor.getString(nameIndex)
+                        if (name == columnName) {
+                            val typeIndex = cursor.getColumnIndex("type")
+                            if (typeIndex != -1) {
+                                val type = cursor.getString(typeIndex)
+                                cursor.close()
+                                return type == expectedType
+                            }
+                        }
+                    }
+                }
+                cursor.close()
+                return false
+            }
+        }
+
+        // Migração para adicionar a coluna diasSemana à tabela grupo_pelada
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Verificar se a coluna diasSemana já existe
+                val cursor = database.query("PRAGMA table_info(grupo_pelada)")
+                val columnNames = mutableListOf<String>()
+                while (cursor.moveToNext()) {
+                    val nameIndex = cursor.getColumnIndex("name")
+                    if (nameIndex != -1) {
+                        val columnName = cursor.getString(nameIndex)
+                        columnNames.add(columnName)
+                    }
+                }
+                cursor.close()
+
+                // Adicionar a coluna diasSemana se ela não existir
+                if (!columnNames.contains("diasSemana")) {
+                    // Criar uma tabela temporária com a nova estrutura incluindo diasSemana
+                    database.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `grupo_pelada_temp` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `nome` TEXT NOT NULL,
+                            `local` TEXT NOT NULL,
+                            `horario` TEXT NOT NULL,
+                            `dataCriacao` INTEGER NOT NULL,
+                            `ultimaModificacao` INTEGER NOT NULL,
+                            `imagemUrl` TEXT,
+                            `descricao` TEXT,
+                            `ativo` INTEGER NOT NULL,
+                            `jogadoresIds` TEXT NOT NULL,
+                            `usuarioId` TEXT NOT NULL,
+                            `compartilhado` INTEGER NOT NULL,
+                            `tipoRecorrencia` TEXT NOT NULL DEFAULT 'ESPORADICA',
+                            `diaSemana` TEXT,
+                            `diasSemana` TEXT NOT NULL DEFAULT '',
+                            `latitude` REAL,
+                            `longitude` REAL,
+                            `endereco` TEXT,
+                            `localNome` TEXT
+                        )
+                        """
+                    )
+
+                    // Copiar todos os dados existentes, usando uma string vazia para diasSemana
+                    database.execSQL(
+                        """
+                        INSERT INTO grupo_pelada_temp (
+                            id, nome, local, horario, dataCriacao, ultimaModificacao,
+                            imagemUrl, descricao, ativo, jogadoresIds, usuarioId, compartilhado,
+                            tipoRecorrencia, diaSemana, diasSemana, latitude, longitude, endereco, localNome
+                        )
+                        SELECT
+                            id, nome, local, horario, dataCriacao, ultimaModificacao,
+                            imagemUrl, descricao, ativo, jogadoresIds, usuarioId, compartilhado,
+                            tipoRecorrencia, diaSemana, '', latitude, longitude, endereco, localNome
+                        FROM grupo_pelada
+                        """
+                    )
+
+                    // Apagar a tabela antiga
+                    database.execSQL("DROP TABLE grupo_pelada")
+
+                    // Renomear a tabela temporária
+                    database.execSQL("ALTER TABLE grupo_pelada_temp RENAME TO grupo_pelada")
+                }
+            }
+        }
+
+        // Migração para adicionar a coluna grupoId à tabela jogadores
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 1. Criar nova tabela jogadores com grupoId obrigatório
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `jogadores_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `grupoId` INTEGER NOT NULL,
+                        `nome` TEXT NOT NULL,
+                        `posicaoPrincipal` TEXT NOT NULL,
+                        `posicaoSecundaria` TEXT,
+                        `notaPosicaoPrincipal` INTEGER NOT NULL,
+                        `notaPosicaoSecundaria` INTEGER,
+                        `ativo` INTEGER NOT NULL DEFAULT 1,
+                        `disponivel` INTEGER NOT NULL DEFAULT 1,
+                        `totalJogos` INTEGER NOT NULL DEFAULT 0,
+                        `vitorias` INTEGER NOT NULL DEFAULT 0,
+                        `derrotas` INTEGER NOT NULL DEFAULT 0,
+                        `empates` INTEGER NOT NULL DEFAULT 0,
+                        `pontuacaoTotal` INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+
+                // 2. Verificar se existe pelo menos um grupo, se não, criar um grupo padrão
+                val cursorGrupos = database.query("SELECT COUNT(*) FROM grupo_pelada")
+                var temGrupos = false
+                if (cursorGrupos.moveToFirst()) {
+                    temGrupos = cursorGrupos.getInt(0) > 0
+                }
+                cursorGrupos.close()
+
+                if (!temGrupos) {
+                    // Criar um grupo padrão se não existir nenhum
+                    val dataHora = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).format(Date())
+                    database.execSQL(
+                        """
+                        INSERT INTO `grupo_pelada` (
+                            `nome`, `local`, `horario`, `dataCriacao`, `ultimaModificacao`, 
+                            `ativo`, `jogadoresIds`, `usuarioId`, `compartilhado`, `tipoRecorrencia`,
+                            `diasSemana`
+                        )
+                        VALUES (
+                            'Pelada Principal', 'Quadra Local', '$dataHora', 
+                            ${System.currentTimeMillis()}, ${System.currentTimeMillis()}, 
+                            1, '[]', 'local', 0, 'ESPORADICA', ''
+                        )
+                        """
+                    )
+                }
+
+                // 3. Obter o ID do primeiro grupo para migrar jogadores existentes
+                val cursorPrimeiroGrupo = database.query("SELECT id FROM grupo_pelada ORDER BY id LIMIT 1")
+                var primeiroGrupoId = 1L
+                if (cursorPrimeiroGrupo.moveToFirst()) {
+                    primeiroGrupoId = cursorPrimeiroGrupo.getLong(0)
+                }
+                cursorPrimeiroGrupo.close()
+
+                // 4. Migrar dados existentes, atribuindo todos os jogadores ao primeiro grupo
+                database.execSQL(
+                    """
+                    INSERT INTO `jogadores_new` (
+                        `id`, `grupoId`, `nome`, `posicaoPrincipal`, `posicaoSecundaria`, 
+                        `notaPosicaoPrincipal`, `notaPosicaoSecundaria`, `ativo`, `disponivel`,
+                        `totalJogos`, `vitorias`, `derrotas`, `empates`, `pontuacaoTotal`
+                    )
+                    SELECT 
+                        `id`, $primeiroGrupoId as `grupoId`, `nome`, `posicaoPrincipal`, `posicaoSecundaria`,
+                        `notaPosicaoPrincipal`, `notaPosicaoSecundaria`, `ativo`, `disponivel`,
+                        `totalJogos`, `vitorias`, `derrotas`, `empates`, `pontuacaoTotal`
+                    FROM `jogadores`
+                    """
+                )
+
+                // 5. Remover tabela antiga e renomear a nova
+                database.execSQL("DROP TABLE `jogadores`")
+                database.execSQL("ALTER TABLE `jogadores_new` RENAME TO `jogadores`")
+
+                // 6. Criar índice para melhor performance
+                database.execSQL("CREATE INDEX `idx_jogadores_grupoId` ON `jogadores`(`grupoId`)")
             }
         }
     }

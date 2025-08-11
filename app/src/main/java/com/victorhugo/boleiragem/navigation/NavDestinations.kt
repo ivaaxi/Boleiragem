@@ -4,6 +4,13 @@ sealed class NavDestinations(val route: String) {
     object Splash : NavDestinations("splash")
     object Home : NavDestinations("home")
 
+    // Novas rotas para gerenciamento de peladas
+    object Login : NavDestinations("login")
+    object GruposPelada : NavDestinations("grupos_pelada")
+    object GrupoDetalhe : NavDestinations("grupo_detalhe/{grupoId}") {
+        fun createRoute(grupoId: Long) = "grupo_detalhe/$grupoId"
+    }
+
     // Bottom Navigation Items
     object CadastroJogadores : NavDestinations("cadastro_jogadores")
     object ConfiguracaoTimes : NavDestinations("configuracao_times")

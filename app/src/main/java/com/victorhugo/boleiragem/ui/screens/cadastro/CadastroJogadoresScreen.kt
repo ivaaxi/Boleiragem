@@ -61,9 +61,13 @@ import com.victorhugo.boleiragem.data.model.PosicaoJogador
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CadastroJogadoresScreen(
-    viewModel: CadastroJogadoresViewModel = hiltViewModel(),
-    onNavigateToDetalheJogador: (Long) -> Unit
+viewModel: CadastroJogadoresViewModel = hiltViewModel(),
+grupoId: Long, // Adicionado este parâmetro
+onNavigateToDetalheJogador: (Long) -> Unit
 ) {
+    // Defina o grupoId no ViewModel
+    viewModel.setGrupoId(grupoId)
+
     val jogadores by viewModel.jogadores.collectAsState(initial = emptyList())
     var showAddJogadorDialog by remember { mutableStateOf(false) }
     var showOrdenarDialog by remember { mutableStateOf(false) }
@@ -170,6 +174,7 @@ fun CadastroJogadoresScreen(
             onDismiss = { showAddJogadorDialog = false },
             onConfirm = { nome, posicaoPrincipal, posicaoSecundaria, notaPrincipal, notaSecundaria ->
                 val novoJogador = Jogador(
+                    grupoId = 0, // Será definido pelo ViewModel baseado no grupo atual
                     nome = nome,
                     posicaoPrincipal = posicaoPrincipal,
                     posicaoSecundaria = posicaoSecundaria,

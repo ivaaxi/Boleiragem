@@ -2,7 +2,6 @@ package com.victorhugo.boleiragem.ui.screens.sorteio
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.victorhugo.boleiragem.data.model.Jogador
 import com.victorhugo.boleiragem.data.model.Time
 import com.victorhugo.boleiragem.data.repository.JogadorRepository
 import com.victorhugo.boleiragem.data.repository.SorteioRepository
@@ -34,6 +33,14 @@ class ResultadoSorteioViewModel @Inject constructor(
     // Verificar se existe uma pelada em andamento
     private val _peladaEmAndamento = MutableStateFlow(false)
     val peladaEmAndamento: StateFlow<Boolean> = _peladaEmAndamento
+
+    // Evento para compartilhar o texto dos times
+    private val _textoCompartilhamento = MutableStateFlow("")
+    val textoCompartilhamento: StateFlow<String> = _textoCompartilhamento
+
+    // Estado para controlar o modo de visualização (normal ou sorteio rápido)
+    private val _modoSorteioRapido = MutableStateFlow(false)
+    val modoSorteioRapido: StateFlow<Boolean> = _modoSorteioRapido
 
     init {
         // Verificar se existe pelada em andamento
@@ -146,40 +153,36 @@ class ResultadoSorteioViewModel @Inject constructor(
     }
 
     fun compartilharResultado() {
-        // Esta função seria implementada para compartilhar o resultado do sorteio
-        // Via Intent para outras aplicações (WhatsApp, etc.)
-
-        // Exemplo de implementação (não funcional neste momento):
-        // val textoCompartilhamento = gerarTextoCompartilhamento()
-        // val sendIntent = Intent().apply {
-        //     action = Intent.ACTION_SEND
-        //     putExtra(Intent.EXTRA_TEXT, textoCompartilhamento)
-        //     type = "text/plain"
-        // }
-        // val shareIntent = Intent.createChooser(sendIntent, "Compartilhar times")
-        // startActivity(context, shareIntent, null)
+        // Gera o texto e o disponibiliza para compartilhamento
+        gerarTextoCompartilhamento()
     }
 
     // Limpa as seleções de capitães
-    fun limparSelecaoCapitaes() {
-        _capitaesSelecionados.value = emptyMap()
+    fun limparCapitaes() {
         _todosCapitaesDefinidos.value = false
     }
 
-    private fun gerarTextoCompartilhamento(): String {
-        val sb = StringBuilder()
-        sb.appendLine("⚽ TIMES SORTEADOS - BOLEIRAGEM ⚽")
-        sb.appendLine()
-
-        resultadoSorteio.value?.times?.forEach { time ->
-            sb.appendLine("🏆 ${time.nome.uppercase()}")
-            time.jogadores.forEach { jogador ->
-                sb.appendLine("- ${jogador.nome} (${jogador.posicaoPrincipal.name})")
+    // Função para gerar o texto formatado para compartilhamento
+    fun gerarTextoCompartilhamento() {
+        val resultado = resultadoSorteio.value ?: return
+        val builder = StringBuilder()
+        resultado.times.forEach { time ->
+            builder.appendLine(time.nome)
+            time.jogadores.forEachIndexed { idx, jogador ->
+                builder.appendLine("${idx + 1}. ${jogador.nome}")
             }
-            sb.appendLine()
+            builder.appendLine()
         }
+        _textoCompartilhamento.value = builder.toString().trim()
+    }
 
-        sb.appendLine("Sorteado pelo app Boleiragem 📱")
-        return sb.toString()
+    // Função para limpar o texto de compartilhamento após compartilhar
+    fun limparTextoCompartilhamento() {
+        _textoCompartilhamento.value = ""
+    }
+
+    // Método para definir o modo de sorteio rápido
+    fun definirModoSorteioRapido(modoRapido: Boolean) {
+        _modoSorteioRapido.value = modoRapido
     }
 }

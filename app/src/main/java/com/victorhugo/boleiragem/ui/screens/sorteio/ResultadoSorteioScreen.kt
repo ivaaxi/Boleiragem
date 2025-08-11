@@ -1,5 +1,6 @@
 package com.victorhugo.boleiragem.ui.screens.sorteio
 
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,9 +75,27 @@ fun ResultadoSorteioScreen(
     val capitaesSelecionados by viewModel.capitaesSelecionados.collectAsState()
     val todosCapitaesDefinidos by viewModel.todosCapitaesDefinidos.collectAsState()
     val peladaEmAndamento by viewModel.peladaEmAndamento.collectAsState()
+    val textoCompartilhamento by viewModel.textoCompartilhamento.collectAsState(initial = "")
+    val modoSorteioRapido by viewModel.modoSorteioRapido.collectAsState()
+    val context = LocalContext.current
 
     // Estado para diálogo de confirmação quando já existe uma pelada em andamento
     var mostrarDialogoConfirmacao by remember { mutableStateOf(false) }
+
+    // Efeito para compartilhar quando o texto for gerado
+    LaunchedEffect(textoCompartilhamento) {
+        if (textoCompartilhamento.isNotBlank()) {
+            val sendIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, textoCompartilhamento)
+                type = "text/plain"
+            }
+            val shareIntent = Intent.createChooser(sendIntent, "Compartilhar times")
+            context.startActivity(shareIntent)
+            // Limpa o texto após compartilhar para evitar múltiplos disparos
+            viewModel.limparTextoCompartilhamento()
+        }
+    }
 
     // Callbacks locais que chamam os métodos do ViewModel e depois os callbacks externos
     val handleConfirmarClick = {
@@ -128,62 +150,100 @@ fun ResultadoSorteioScreen(
         )
     }
 
+    // Título da barra superior - diferente dependendo do modo
+    val tituloAppBar = if (modoSorteioRapido) "Sorteio Rápido" else "Resultado do Sorteio"
+
+    // Determinar se estamos no modo rápido e já mostrar o botão de compartilhar em vez de confirmar
+    val botaoConfirmar = modoSorteioRapido
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Resultado do Sorteio") },
+                title = { Text(tituloAppBar) },
                 navigationIcon = {
-                    IconButton(onClick = { handleCancelarClick() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.compartilharResultado() }) {
+                    IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Compartilhar"
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Voltar"
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
         bottomBar = {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars),
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 16.dp,
-                            bottom = 16.dp
-                        ),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            if (resultadoSorteio != null) {
+                Surface(
+                    tonalElevation = 3.dp,
+                    shadowElevation = 3.dp
                 ) {
-                    OutlinedButton(
-                        onClick = { handleCancelarClick() },
-                        modifier = Modifier.weight(1f)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
                     ) {
-                        Text("CANCELAR")
-                    }
-                    Button(
-                        onClick = { handleConfirmarClick() },
-                        modifier = Modifier.weight(1f),
-                        enabled = todosCapitaesDefinidos
-                    ) {
-                        Text("CONFIRMAR")
+                        // No modo sorteio rápido, mostramos apenas o botão de compartilhar
+                        if (modoSorteioRapido) {
+                            // Botão de compartilhar no modo sorteio rápido
+                            Button(
+                                onClick = { viewModel.gerarTextoCompartilhamento() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Compartilhar"
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("COMPARTILHAR")
+                            }
+                        } else {
+                            // Modo normal - botões de confirmar e cancelar
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Botão Cancelar (apenas no modo normal)
+                                OutlinedButton(
+                                    onClick = onCancelarClick,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("CANCELAR")
+                                }
+
+                                // Botão Confirmar (apenas no modo normal)
+                                Button(
+                                    onClick = handleConfirmarClick,
+                                    enabled = todosCapitaesDefinidos,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Confirmar"
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("CONFIRMAR")
+                                }
+                            }
+
+                            // Botão de compartilhar no modo normal
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = { viewModel.gerarTextoCompartilhamento() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Compartilhar"
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("COMPARTILHAR")
+                            }
+                        }
                     }
                 }
             }
@@ -210,69 +270,113 @@ fun ResultadoSorteioScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Instrução para selecionar os capitães
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (!todosCapitaesDefinidos)
-                            MaterialTheme.colorScheme.primaryContainer
-                        else
-                            MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if (!todosCapitaesDefinidos)
-                                  "Selecione o capitão de cada time"
-                              else
-                                  "Todos os capitães foram selecionados!",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (!todosCapitaesDefinidos)
-                                MaterialTheme.colorScheme.onPrimaryContainer
+                if (!modoSorteioRapido) {
+                    // Modo normal - Mostra instrução para selecionar capitães
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (!todosCapitaesDefinidos)
+                                MaterialTheme.colorScheme.primaryContainer
                             else
-                                MaterialTheme.colorScheme.onSecondaryContainer
+                                MaterialTheme.colorScheme.secondaryContainer
                         )
-
-                        if (!todosCapitaesDefinidos) {
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Text(
-                                text = "Você precisa escolher um capitão para cada time antes de continuar",
+                                text = if (!todosCapitaesDefinidos)
+                                      "Selecione o capitão de cada time"
+                                  else
+                                      "Todos os capitães foram selecionados!",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (!todosCapitaesDefinidos)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+
+                            if (!todosCapitaesDefinidos) {
+                                Text(
+                                    text = "Você precisa escolher um capitão para cada time antes de continuar",
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Todos capitães selecionados",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Exibe os times sorteados com a opção de selecionar capitães
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        resultadoSorteio?.let { resultado ->
+                            items(resultado.times) { time ->
+                                val capitaoId = capitaesSelecionados[time.id.toLong()]
+                                TimeCard(
+                                    time = time,
+                                    capitaoId = capitaoId,
+                                    onJogadorClick = { jogador ->
+                                        viewModel.selecionarCapitao(time.id.toLong(), jogador.id.toLong())
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Modo Sorteio Rápido - Mostra apenas os resultados sem opção de selecionar capitães
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Resultado do Sorteio Rápido",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+
+                            Text(
+                                text = "Para compartilhar os times, use o botão abaixo",
                                 textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Todos capitães selecionados",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(24.dp)
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
                     }
-                }
 
-                // Exibe os times sorteados com a opção de selecionar capitães
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    resultadoSorteio?.let { resultado ->
-                        items(resultado.times) { time ->
-                            val capitaoId = capitaesSelecionados[time.id.toLong()]
-                            TimeCard(
-                                time = time,
-                                capitaoId = capitaoId,
-                                onJogadorClick = { jogador ->
-                                    viewModel.selecionarCapitao(time.id.toLong(), jogador.id.toLong())
-                                }
-                            )
+                    // Exibe os times sorteados sem a opção de selecionar capitães
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        resultadoSorteio?.let { resultado ->
+                            items(resultado.times) { time ->
+                                TimeCardSimples(time = time)
+                            }
                         }
                     }
                 }
@@ -442,6 +546,131 @@ fun TimeCard(
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
+                        }
+
+                        Text(
+                            text = "${jogador.pontuacaoTotal} pts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TimeCardSimples(
+    time: Time
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Verificamos se é o Time Reserva
+            val isTimeReserva = time.nome == "Time Reserva"
+
+            // Título do Time com estilo diferente para o Time Reserva
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = time.nome,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isTimeReserva) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Divider()
+
+            // Se for o Time Reserva, mostramos uma explicação sobre sua função
+            if (isTimeReserva) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text(
+                            text = "Time de Revezamento",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            text = "Os jogadores do Time Reserva farão revezamento com os times que perderem partidas. Um jogador reserva substitui um jogador do time perdedor após cada jogo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Jogadores para revezamento:",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+
+                // Lista de jogadores reserva sem opção de selecionar capitão
+                time.jogadores.forEach { jogador ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = jogador.nome,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+
+                            Text(
+                                text = "${jogador.posicaoPrincipal.name} (${jogador.notaPosicaoPrincipal}⭐)",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                        Text(
+                            text = "${jogador.pontuacaoTotal} pts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                // Para times normais, apenas mostra os jogadores
+                time.jogadores.forEach { jogador ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = jogador.nome,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+
+                            Text(
+                                text = "${jogador.posicaoPrincipal.name} (${jogador.notaPosicaoPrincipal}⭐)",
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
 
                         Text(

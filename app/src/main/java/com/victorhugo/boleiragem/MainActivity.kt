@@ -1,17 +1,27 @@
 package com.victorhugo.boleiragem
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,6 +32,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
 import com.victorhugo.boleiragem.navigation.BoleiragemBottomNavigationBar
@@ -31,7 +44,10 @@ import com.victorhugo.boleiragem.ui.screens.cadastro.DetalheJogadorScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.ConfiguracaoPontuacaoScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.ConfiguracaoTimesScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.GerenciadorPerfisScreen
+import com.victorhugo.boleiragem.ui.screens.estatisticas.EstatisticasScreen
+import com.victorhugo.boleiragem.ui.screens.grupos.GruposPeladaScreen
 import com.victorhugo.boleiragem.ui.screens.historico.HistoricoScreen
+import com.victorhugo.boleiragem.ui.screens.login.LoginScreen
 import com.victorhugo.boleiragem.ui.screens.sorteio.ResultadoSorteioScreen
 import com.victorhugo.boleiragem.ui.screens.sorteio.SorteioTimesScreen
 import com.victorhugo.boleiragem.ui.screens.splash.SplashScreen
@@ -42,6 +58,18 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    // Flag para acompanhar se as permissões já foram solicitadas
+    private var permissionsRequested = false
+
+    // Lançador para solicitar permissões
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.entries.all { it.value }
+        // Permissões solicitadas, independente do resultado
+        permissionsRequested = true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Reativando a splash screen agora que o problema dos ícones foi corrigido
         installSplashScreen()
@@ -49,9 +77,35 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Solicitar permissões de localização ao iniciar o app
+        requestLocationPermissions()
+
         setContent {
             BoleiragemTheme {
                 BoleiragemApp()
+            }
+        }
+    }
+
+    private fun requestLocationPermissions() {
+        if (!permissionsRequested) {
+            val hasLocationPermission = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+            // Se ainda não temos permissão, solicitar
+            if (!hasLocationPermission) {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
             }
         }
     }
@@ -61,22 +115,73 @@ class MainActivity : ComponentActivity() {
 fun BoleiragemApp() {
     // Estado para controlar a exibição da SplashScreen
     var showSplashScreen by remember { mutableStateOf(true) }
+    // Estado para controlar a exibição da tela de login
+    var showLoginScreen by remember { mutableStateOf(false) }
+    // Estado para controlar a exibição da tela de grupos
+    var showGruposScreen by remember { mutableStateOf(false) }
+    // Estado para armazenar o ID do grupo selecionado
+    var grupoSelecionadoId by remember { mutableStateOf(-1L) }
+    // Estado para armazenar o nome do grupo selecionado
+    var grupoSelecionadoNome by remember { mutableStateOf("") }
 
-    if (showSplashScreen) {
-        // Mostrar a SplashScreen enquanto o aplicativo está inicializando
-        SplashScreen(onNavigateToHome = {
-            // Quando a SplashScreen terminar, apenas altera o estado
-            showSplashScreen = false
-        })
-    } else {
-        // Depois da SplashScreen, mostra o conteúdo principal
-        MainScreen()
+    when {
+        showSplashScreen -> {
+            // Mostrar a SplashScreen enquanto o aplicativo está inicializando
+            SplashScreen(onNavigateToHome = {
+                // Quando a SplashScreen terminar, mostrar a tela de login
+                showSplashScreen = false
+                showLoginScreen = true
+            })
+        }
+        showLoginScreen -> {
+            // Mostrar a tela de login
+            LoginScreen(
+                onLoginClick = {
+                    // Quando o usuário fizer login, mostrar a tela de grupos
+                    showLoginScreen = false
+                    showGruposScreen = true
+                },
+                onEntrarSemContaClick = {
+                    // Quando o usuário entrar sem conta, mostrar a tela de grupos
+                    showLoginScreen = false
+                    showGruposScreen = true
+                }
+            )
+        }
+        showGruposScreen -> {
+            // Mostrar a tela de grupos
+            val navController = rememberNavController()
+            GruposPeladaScreen(
+                onGrupoSelecionado = { grupoId, grupoNome ->
+                    // Quando um grupo for selecionado, mostrar o conteúdo principal
+                    grupoSelecionadoId = grupoId
+                    grupoSelecionadoNome = grupoNome
+                    showGruposScreen = false
+                },
+                navController = navController
+            )
+        }
+        else -> {
+            // Mostrar o conteúdo principal do aplicativo
+            MainScreen(
+                grupoId = grupoSelecionadoId,
+                grupoNome = grupoSelecionadoNome,
+                onVoltarParaGerenciamento = {
+                    // Voltar para a tela de gerenciamento de peladas
+                    showGruposScreen = true
+                }
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    grupoId: Long = -1L,
+    grupoNome: String = "", // Adicionando parâmetro para o nome do grupo
+    onVoltarParaGerenciamento: () -> Unit = {}
+) {
     // Estados para controlar a navegação
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
@@ -119,6 +224,38 @@ fun MainScreen() {
     // Scaffold com a barra de navegação inferior
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        topBar = {
+            if (!isSecondaryScreen) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Boleiragem")
+                            if (grupoNome.isNotBlank()) {
+                                Text(
+                                    text = grupoNome,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        androidx.compose.material3.IconButton(onClick = onVoltarParaGerenciamento) {
+                            androidx.compose.material3.Icon(
+                                imageVector = Icons.Filled.ArrowBack,
+                                contentDescription = "Voltar para gerenciamento",
+                                tint = Color.White
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
+        },
         bottomBar = {
             if (!isSecondaryScreen) {
                 BoleiragemBottomNavigationBar(
@@ -154,6 +291,7 @@ fun MainScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             CadastroJogadoresScreen(
+                                grupoId = grupoId, // Passando o ID do grupo selecionado
                                 onNavigateToDetalheJogador = { jogadorId ->
                                     isSecondaryScreen = true
                                     secondaryScreenContent = {
@@ -223,16 +361,7 @@ fun MainScreen() {
                     )
                     3 -> TimesAtuaisScreen() // Tela de times atuais
                     4 -> HistoricoScreen() // Nova tela de histórico
-                    5 -> {
-                        // Tela de estatísticas
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Placeholder para a tela de estatísticas
-                            Text("Tela de Estatísticas")
-                        }
-                    }
+                    5 -> EstatisticasScreen() // Tela de estatísticas
                 }
             }
         }

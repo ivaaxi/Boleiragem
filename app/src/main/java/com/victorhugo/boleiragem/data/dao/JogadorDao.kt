@@ -15,6 +15,18 @@ interface JogadorDao {
     @Query("SELECT * FROM jogadores WHERE ativo = 1 ORDER BY nome ASC")
     fun getJogadoresAtivos(): Flow<List<Jogador>>
 
+    @Query("SELECT * FROM jogadores WHERE grupoId = :grupoId ORDER BY nome ASC")
+    fun getJogadoresPorGrupo(grupoId: Long): Flow<List<Jogador>>
+
+    @Query("SELECT * FROM jogadores WHERE grupoId = :grupoId AND ativo = 1 ORDER BY nome ASC")
+    fun getJogadoresAtivosPorGrupo(grupoId: Long): Flow<List<Jogador>>
+
+    @Query("SELECT * FROM jogadores WHERE grupoId = :grupoId ORDER BY nome ASC")
+    suspend fun getJogadoresListPorGrupo(grupoId: Long): List<Jogador>
+
+    @Query("SELECT COUNT(*) FROM jogadores WHERE grupoId = :grupoId AND ativo = 1")
+    suspend fun countJogadoresAtivosPorGrupo(grupoId: Long): Int
+
     @Insert
     suspend fun inserirJogador(jogador: Jogador): Long
 
