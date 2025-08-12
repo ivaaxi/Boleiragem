@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -167,6 +168,14 @@ class SorteioRepository @Inject constructor(
 
     // Método para carregar os times da última pelada ao iniciar o app
     fun getTimesUltimaPelada(): Flow<List<HistoricoTime>> {
+        return historicoTimeDao.getTimesUltimaPelada()
+    }
+
+    // Método para carregar os times da última pelada de um grupo específico
+    fun getTimesUltimaPeladaPorGrupo(grupoId: Long): Flow<List<HistoricoTime>> {
+        // Como ainda não temos o campo grupoId na entidade HistoricoTime,
+        // vamos retornar todos os times da última pelada por enquanto
+        // Em uma futura atualização, você deve adicionar o campo grupoId à entidade HistoricoTime
         return historicoTimeDao.getTimesUltimaPelada()
     }
 

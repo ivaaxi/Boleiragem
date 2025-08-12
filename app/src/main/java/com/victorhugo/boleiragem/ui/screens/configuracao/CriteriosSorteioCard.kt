@@ -4,33 +4,45 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
 import com.victorhugo.boleiragem.data.model.CriterioSorteio
+
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 /**
  * Card para configuração dos critérios de sorteio
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CriteriosSorteioCard(
     aleatorio: Boolean,
     criteriosExtras: Set<CriterioSorteio>,
     onAleatorioChange: (Boolean) -> Unit,
     onCriterioExtraToggle: (CriterioSorteio) -> Unit,
-    onGerenciarPerfisClick: () -> Unit = {} // Mantém o parâmetro por compatibilidade, mas não usa mais
+    onGerenciarPerfisClick: () -> Unit = {}, // Para navegação para a tela de gerenciamento de perfis
+    configuracoesDisponiveis: List<ConfiguracaoSorteio> = emptyList(), // Nova propriedade para lista de configurações
+    configSelecionada: ConfiguracaoSorteio? = null, // Nova propriedade para a configuração selecionada
+    onConfiguracaoSelecionada: (ConfiguracaoSorteio) -> Unit = {} // Callback para quando uma nova configuração é selecionada
 ) {
+    // Estado para controlar a expansão do dropdown
+    var dropdownExpandido by remember { mutableStateOf(false) }
+
     Card(
-        modifier = Modifier.fillMaxWidth() // Removido o padding externo para igualar ao outro card
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Cabeçalho apenas com título, sem o botão de engrenagem
+            // Cabeçalho com título
             Text(
                 text = "Critérios para Sorteio",
                 style = MaterialTheme.typography.titleLarge,
@@ -38,11 +50,86 @@ fun CriteriosSorteioCard(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
+            // Spinner de seleção de perfis (novo componente)
+            if (configuracoesDisponiveis.isNotEmpty()) {
+                Text(
+                    text = "Perfil de Configuração",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                )
+
+                // Dropdown para seleção de configuração
+                ExposedDropdownMenuBox(
+                    expanded = dropdownExpandido,
+                    onExpandedChange = { dropdownExpandido = !dropdownExpandido }
+                ) {
+                    OutlinedTextField(
+                        value = configSelecionada?.nome ?: "Selecione um perfil",
+                        onValueChange = { },
+                        readOnly = true,
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpandido)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = dropdownExpandido,
+                        onDismissRequest = { dropdownExpandido = false }
+                    ) {
+                        // Mostra os perfis reais de configuração
+                        configuracoesDisponiveis.forEach { config ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(config.nome)
+                                        if (config.isPadrao) {
+                                            Text(
+                                                text = "(Padrão)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    onConfiguracaoSelecionada(config)
+                                    dropdownExpandido = false
+                                }
+                            )
+                        }
+
+                        // Opção de gerenciar perfis
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Gerenciar perfis...",
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                dropdownExpandido = false
+                                onGerenciarPerfisClick()
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             // Critério Principal: Aleatório (Switch) - Tornando toda a área clicável
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onAleatorioChange(!aleatorio) } // Tornando toda a Row clicável
+                    .clickable { onAleatorioChange(!aleatorio) }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

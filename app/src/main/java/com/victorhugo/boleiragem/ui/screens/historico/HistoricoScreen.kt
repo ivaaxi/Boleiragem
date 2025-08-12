@@ -28,8 +28,15 @@ import java.util.*
 @Composable
 fun HistoricoScreen(
     historicoViewModel: HistoricoViewModel = hiltViewModel(),
-    estatisticasViewModel: EstatisticasViewModel = hiltViewModel()
+    estatisticasViewModel: EstatisticasViewModel = hiltViewModel(),
+    grupoId: Long = -1L // Adicionando parâmetro grupoId
 ) {
+    // Efeito para definir o ID do grupo quando a tela é carregada
+    LaunchedEffect(grupoId) {
+        historicoViewModel.setGrupoId(grupoId)
+        estatisticasViewModel.setGrupoId(grupoId)
+    }
+
     // Histórico
     val historicoPartidas by historicoViewModel.historicoPartidas.collectAsState(initial = emptyList())
     val ordenacaoAtual by historicoViewModel.ordenacaoAtual.collectAsState()

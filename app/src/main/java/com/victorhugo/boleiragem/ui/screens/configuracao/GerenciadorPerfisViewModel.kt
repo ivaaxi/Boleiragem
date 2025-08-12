@@ -1,5 +1,6 @@
 package com.victorhugo.boleiragem.ui.screens.configuracao
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
@@ -9,16 +10,29 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class GerenciadorPerfisViewModel @Inject constructor(
-    private val configuracaoRepository: ConfiguracaoRepository
+    private val configuracaoRepository: ConfiguracaoRepository,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    // Lista de todos os perfis
+    // Obtém o ID do grupo da navegação
+    private val grupoId: Long = savedStateHandle.get<Long>("grupoId") ?: 0L
+
+    // Método para definir o ID do grupo atual
+    fun setGrupoId(id: Long) {
+        configuracaoRepository.setGrupoId(id)
+        // Recarrega os perfis com o novo ID de grupo
+        _perfis.value = emptyList()
+    }
+
+    // Lista de todos os perfis para o grupo atual
+    private val _perfis = MutableStateFlow<List<ConfiguracaoSorteio>>(emptyList())
     val perfis = configuracaoRepository.getTodasConfiguracoes()
         .stateIn(
             scope = viewModelScope,
@@ -40,7 +54,8 @@ class GerenciadorPerfisViewModel @Inject constructor(
             nome = "Novo Perfil",
             qtdJogadoresPorTime = 5,
             qtdTimes = 2,
-            aleatorio = true
+            aleatorio = true,
+            grupoId = grupoId
         )
     }
 
@@ -51,8 +66,11 @@ class GerenciadorPerfisViewModel @Inject constructor(
 
     // Confirma a criação/edição de um perfil
     fun salvarPerfil(perfil: ConfiguracaoSorteio) {
+        // Garantir que o grupoId está sempre definido
+        val perfilAtualizado = perfil.copy(grupoId = grupoId)
+
         viewModelScope.launch {
-            configuracaoRepository.salvarConfiguracao(perfil)
+            configuracaoRepository.salvarConfiguracao(perfilAtualizado)
             // Fecha o diálogo de edição
             _perfilEmEdicao.value = null
         }
@@ -73,7 +91,22 @@ class GerenciadorPerfisViewModel @Inject constructor(
         val perfil = _perfilParaExcluir.value ?: return
 
         viewModelScope.launch {
-            configuracaoRepository.deletarConfiguracao(perfil.id)
+            // Verificar se há pelo menos dois perfis antes de excluir
+            val perfisAtuais = configuracaoRepository.getTodasConfiguracoes().firstOrNull() ?: emptyList()
+            if (perfisAtuais.size > 1) {
+                // Se o perfil a ser excluído é o padrão, temos que definir outro como padrão primeiro
+                if (perfil.isPadrao) {
+                    // Encontrar outro perfil para definir como padrão
+                    val outroPerfil = perfisAtuais.firstOrNull { it.id != perfil.id }
+                    if (outroPerfil != null) {
+                        configuracaoRepository.definirConfiguracaoPadrao(outroPerfil.id)
+                    }
+                }
+
+                // Agora podemos excluir com segurança
+                configuracaoRepository.deletarConfiguracao(perfil.id)
+            }
+
             // Fecha o diálogo de confirmação
             _perfilParaExcluir.value = null
         }

@@ -24,11 +24,18 @@ import com.victorhugo.boleiragem.ui.common.Dimensions.standardButtonWidth
 @Composable
 fun SorteioTimesScreen(
     viewModel: SorteioTimesViewModel = hiltViewModel(),
+    grupoId: Long = -1L, // Adicionando o parâmetro grupoId
     onSorteioRealizado: () -> Unit = {},
     onNavigateToHistorico: () -> Unit = {}
 ) {
+    // Efeito para definir o ID do grupo quando a tela é carregada
+    LaunchedEffect(grupoId) {
+        viewModel.setGrupoId(grupoId)
+    }
+
     val jogadores by viewModel.jogadores.collectAsState(initial = emptyList())
     val configuracao by viewModel.configuracao.collectAsState(initial = null)
+    val configuracaoSelecionada by viewModel.configuracaoSelecionada.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val sorteioRealizado by viewModel.sorteioRealizado.collectAsState()
     val mostrarDialogConfirmacao by viewModel.mostrarDialogConfirmacao.collectAsState()
@@ -145,10 +152,14 @@ fun SorteioTimesScreen(
                         // Dropdown para seleção de configuração
                         ExposedDropdownMenuBox(
                             expanded = dropdownExpandido,
-                            onExpandedChange = { if (!temPeladaAtiva) dropdownExpandido = !dropdownExpandido }
+                            onExpandedChange = {
+                                // Corrigindo o problema: sempre permitir expandir o dropdown
+                                // se não houver pelada ativa
+                                if (!temPeladaAtiva) dropdownExpandido = !dropdownExpandido
+                            }
                         ) {
                             OutlinedTextField(
-                                value = configuracao?.nome ?: "Selecione uma configuração",
+                                value = configuracaoSelecionada?.nome ?: configuracao?.nome ?: "Selecione uma configuração",
                                 onValueChange = { },
                                 readOnly = true,
                                 enabled = !temPeladaAtiva,
@@ -168,7 +179,21 @@ fun SorteioTimesScreen(
                                 // Mostra os perfis reais de configuração
                                 viewModel.configuracoesDisponiveis.forEach { config ->
                                     DropdownMenuItem(
-                                        text = { Text(config.nome) },
+                                        text = {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(config.nome)
+                                                if (config.isPadrao) {
+                                                    Text(
+                                                        text = "(Padrão)",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+                                        },
                                         onClick = {
                                             viewModel.selecionarConfiguracao(config)
                                             dropdownExpandido = false

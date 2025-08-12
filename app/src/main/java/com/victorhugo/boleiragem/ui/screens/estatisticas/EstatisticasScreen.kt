@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -48,8 +49,14 @@ import com.victorhugo.boleiragem.data.model.Jogador
 @Composable
 fun EstatisticasScreen(
     viewModel: EstatisticasViewModel = hiltViewModel(),
+    grupoId: Long = -1L, // Adicionando parâmetro grupoId
     onNavigateBack: () -> Unit = {}
 ) {
+    // Efeito para definir o ID do grupo quando a tela é carregada
+    LaunchedEffect(grupoId) {
+        viewModel.setGrupoId(grupoId)
+    }
+
     val jogadores by viewModel.jogadores.collectAsState(initial = emptyList())
     val jogadorSelecionado by viewModel.jogadorSelecionado.collectAsState()
     val ranking by viewModel.ranking.collectAsState(initial = emptyList())

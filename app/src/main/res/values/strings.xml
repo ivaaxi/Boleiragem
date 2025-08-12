@@ -1,7 +1,3 @@
 <resources>
     <string name="app_name">Boleiragem</string>
-    <!-- Para usar o mapa, é necessário obter uma chave de API válida do Google Cloud Console -->
-    <!-- Visite: https://console.cloud.google.com/apis/credentials -->
-    <!-- Certifique-se de habilitar as APIs: Maps SDK for Android e Places API -->
-    <string name="google_maps_key">AIzaSyDOOVPAZdV-aKGo-v9M5aGAOCgQMuZkA04</string>
 </resources>

@@ -22,6 +22,11 @@ class ConfiguracaoTimesViewModel @Inject constructor(
     private val repository: ConfiguracaoRepository
 ) : ViewModel() {
 
+    // Método para definir o ID do grupo atual
+    fun setGrupoId(id: Long) {
+        repository.setGrupoId(id)
+    }
+
     // Configuração atualmente selecionada
     val configuracao = repository.getConfiguracao()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -169,13 +174,13 @@ class ConfiguracaoTimesViewModel @Inject constructor(
     // Método para salvar a configuração atual com verificação de duplicidade
     fun iniciarSalvamentoConfiguracao() {
         val novaConfig = ConfiguracaoSorteio(
-            id = configuracaoSelecionadaId.value,
+            id = 0, // Usando 0 para indicar uma nova configuração (será atribuído automaticamente)
             nome = nomeConfiguracao,
             qtdJogadoresPorTime = jogadoresPorTime,
             qtdTimes = quantidadeTimes,
             aleatorio = aleatorio,
             criteriosExtras = criteriosExtras,
-            isPadrao = true
+            isPadrao = false // Não definimos como padrão automaticamente
         )
 
         configuracaoParaSalvar = novaConfig

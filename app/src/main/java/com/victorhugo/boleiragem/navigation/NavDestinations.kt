@@ -26,6 +26,8 @@ sealed class NavDestinations(val route: String) {
 
     object ResultadoSorteio : NavDestinations("resultado_sorteio")
 
-    // Nova rota para gerenciamento de perfis de configuração
-    object GerenciadorPerfis : NavDestinations("gerenciador_perfis")
+     // Rota para gerenciamento de perfis de configuração com ID do grupo
+    object GerenciadorPerfis : NavDestinations("gerenciador_perfis/{grupoId}") {
+        fun createRoute(grupoId: Long) = "gerenciador_perfis/$grupoId"
+    }
 }

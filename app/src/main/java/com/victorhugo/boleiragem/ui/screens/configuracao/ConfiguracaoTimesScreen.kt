@@ -54,9 +54,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun ConfiguracaoTimesScreen(
     viewModel: ConfiguracaoTimesViewModel = hiltViewModel(),
+    grupoId: Long = -1L, // Adicionando parâmetro grupoId
     onNavigateToConfiguracaoPontuacao: () -> Unit = {},
     onNavigateToGerenciadorPerfis: () -> Unit = {}
 ) {
+    // Efeito para definir o ID do grupo quando a tela é carregada
+    LaunchedEffect(grupoId) {
+        viewModel.setGrupoId(grupoId)
+    }
+
     val configuracao by viewModel.configuracao.collectAsState(null)
     val todasConfiguracoes by viewModel.todasConfiguracoes.collectAsState()
     val configuracaoSelecionadaId by viewModel.configuracaoSelecionadaId.collectAsState()
@@ -318,12 +324,16 @@ fun ConfiguracaoTimesScreen(
                     )
 
                     // Usando o componente atualizado de critérios de sorteio com navegação
+                    // Fornecendo a lista completa de configurações e a configuração selecionada atual
                     CriteriosSorteioCard(
                         aleatorio = viewModel.aleatorio,
                         criteriosExtras = viewModel.criteriosExtras,
                         onAleatorioChange = { viewModel.toggleAleatorio(it) },
                         onCriterioExtraToggle = { viewModel.toggleCriterioExtra(it) },
-                        onGerenciarPerfisClick = { viewModel.navegarParaGerenciadorPerfis() }
+                        onGerenciarPerfisClick = { viewModel.navegarParaGerenciadorPerfis() },
+                        configuracoesDisponiveis = todasConfiguracoes,
+                        configSelecionada = todasConfiguracoes.find { it.id == configuracaoSelecionadaId },
+                        onConfiguracaoSelecionada = { viewModel.selecionarConfiguracao(it.id) }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))

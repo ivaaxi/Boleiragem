@@ -6,9 +6,7 @@ import com.victorhugo.boleiragem.data.model.Jogador
 import com.victorhugo.boleiragem.data.repository.JogadorRepository
 import com.victorhugo.boleiragem.data.repository.HistoricoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -17,8 +15,8 @@ class EstatisticasViewModel @Inject constructor(
     private val jogadorRepository: JogadorRepository
 ) : ViewModel() {
 
-    // Lista de todos os jogadores
-    val jogadores = jogadorRepository.getJogadores()
+    // Estado para armazenar o ID do grupo atual
+    private val _grupoId = MutableStateFlow(-1L)
 
     // Jogador selecionado para visualizar estatísticas detalhadas
     private val _jogadorSelecionado = MutableStateFlow<Jogador?>(null)
@@ -56,15 +54,38 @@ class EstatisticasViewModel @Inject constructor(
         } ?: 0f
     }
 
-    // Ranking entre jogadores (baseado na pontuação total)
-    val ranking = jogadores.map { listaJogadores ->
-        listaJogadores
-            .filter { it.ativo && it.totalJogos > 0 }
-            .sortedByDescending { it.pontuacaoTotal }
+    // Jogadores filtrados pelo grupo atual
+    val jogadores = _grupoId.map { grupoId ->
+        if (grupoId > 0) {
+            jogadorRepository.getJogadoresPorGrupo(grupoId)
+        } else {
+            // Fallback para compatibilidade, mas não deve ser usado
+            MutableStateFlow(emptyList())
+        }
+    }.flatMapLatest { it }
+
+    // Ranking filtrado pelo grupo atual
+    val ranking = _grupoId.map { grupoId ->
+        if (grupoId > 0) {
+            jogadorRepository.getJogadoresPorGrupo(grupoId)
+        } else {
+            // Fallback para compatibilidade, mas não deve ser usado
+            MutableStateFlow(emptyList())
+        }
+    }.flatMapLatest { flow ->
+        flow.map { jogadores ->
+            // Ordena jogadores por pontuação total (decrescente)
+            jogadores.sortedByDescending { it.pontuacaoTotal }
+        }
     }
 
     fun selecionarJogador(jogador: Jogador) {
         _jogadorSelecionado.value = jogador
+    }
+
+    // Método para definir o ID do grupo atual
+    fun setGrupoId(id: Long) {
+        _grupoId.value = id
     }
 
     // Calcular estatísticas adicionais do jogador

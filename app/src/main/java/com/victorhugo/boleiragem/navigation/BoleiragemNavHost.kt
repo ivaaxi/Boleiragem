@@ -74,7 +74,10 @@ fun BoleiragemNavHost(
 
         // Tela de gerenciamento de perfis de configuração (sem bottom navigation)
         composable(
-            route = NavDestinations.GerenciadorPerfis.route
+            route = NavDestinations.GerenciadorPerfis.route,
+            arguments = listOf(
+                navArgument("grupoId") { type = NavType.LongType }
+            )
         ) {
             GerenciadorPerfisScreen(
                 onNavigateBack = {

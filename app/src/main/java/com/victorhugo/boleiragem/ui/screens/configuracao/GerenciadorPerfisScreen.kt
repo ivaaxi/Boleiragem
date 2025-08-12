@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,11 +58,17 @@ import com.victorhugo.boleiragem.data.model.CriterioSorteio
 @Composable
 fun GerenciadorPerfisScreen(
     viewModel: GerenciadorPerfisViewModel = hiltViewModel(),
+    grupoId: Long = 0L, // Adicionando o parâmetro grupoId com valor padrão
     onNavigateBack: () -> Unit
 ) {
     val perfis by viewModel.perfis.collectAsState()
     val perfilEmEdicao by viewModel.perfilEmEdicao.collectAsState()
     val perfilParaExcluir by viewModel.perfilParaExcluir.collectAsState()
+
+    // Efeito para definir o ID do grupo quando a tela é carregada
+    LaunchedEffect(grupoId) {
+        viewModel.setGrupoId(grupoId)
+    }
 
     Scaffold(
         topBar = {
@@ -108,7 +115,8 @@ fun GerenciadorPerfisScreen(
                             perfil = perfil,
                             onEdit = { viewModel.editarPerfil(perfil) },
                             onDelete = { viewModel.confirmarExclusao(perfil) },
-                            onSetDefault = { viewModel.definirComoPadrao(perfil.id) }
+                            onSetDefault = { viewModel.definirComoPadrao(perfil.id) },
+                            isUnicoPerfil = perfis.size <= 1 // Desabilita a exclusão quando há apenas um perfil
                         )
                     }
                 }
@@ -150,7 +158,8 @@ fun PerfilItem(
     perfil: ConfiguracaoSorteio,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onSetDefault: () -> Unit
+    onSetDefault: () -> Unit,
+    isUnicoPerfil: Boolean = false // Novo parâmetro para verificar se é o único perfil
 ) {
     Card(
         modifier = Modifier
@@ -199,8 +208,16 @@ fun PerfilItem(
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "Editar")
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Excluir")
+                    // Desativar o botão de exclusão se for o único perfil
+                    IconButton(
+                        onClick = onDelete,
+                        enabled = !isUnicoPerfil
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Excluir",
+                            tint = if (isUnicoPerfil) Color.Gray else MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }

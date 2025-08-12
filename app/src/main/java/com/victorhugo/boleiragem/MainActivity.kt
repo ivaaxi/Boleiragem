@@ -8,9 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -34,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.rememberNavController
@@ -226,18 +231,16 @@ fun MainScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             if (!isSecondaryScreen) {
+                // Barra superior compacta como "Minhas Peladas"
                 TopAppBar(
                     title = {
-                        Column {
-                            Text("Boleiragem")
-                            if (grupoNome.isNotBlank()) {
-                                Text(
-                                    text = grupoNome,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                        Text(
+                            text = grupoNome.ifBlank { "Boleiragem" },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Start // Alinhamento à esquerda
+                        )
                     },
                     navigationIcon = {
                         androidx.compose.material3.IconButton(onClick = onVoltarParaGerenciamento) {
@@ -252,7 +255,8 @@ fun MainScreen(
                         containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
                         navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                    ),
+                    modifier = Modifier.height(56.dp) // Altura padrão reduzida
                 )
             }
         },
@@ -307,6 +311,7 @@ fun MainScreen(
                         }
                     }
                     1 -> ConfiguracaoTimesScreen(
+                        grupoId = grupoId, // Passando o ID do grupo selecionado
                         onNavigateToConfiguracaoPontuacao = {
                             isSecondaryScreen = true
                             secondaryScreenContent = {
@@ -321,6 +326,7 @@ fun MainScreen(
                             isSecondaryScreen = true
                             secondaryScreenContent = {
                                 GerenciadorPerfisScreen(
+                                    grupoId = grupoId, // Passando o ID do grupo selecionado
                                     onNavigateBack = {
                                         isSecondaryScreen = false
                                     }
@@ -329,6 +335,7 @@ fun MainScreen(
                         }
                     )
                     2 -> SorteioTimesScreen(
+                        grupoId = grupoId, // Passando o ID do grupo selecionado
                         onSorteioRealizado = {
                             // Mostra a tela de resultado do sorteio
                             isSecondaryScreen = true

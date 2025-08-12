@@ -31,6 +31,10 @@ class HistoricoViewModel @Inject constructor(
     // Lista original de partidas (sem ordenação)
     private var partidasOriginais = listOf<HistoricoPelada>()
 
+    // Estado para armazenar o ID do grupo atual
+    private val _grupoId = MutableStateFlow(-1L)
+    val grupoId: StateFlow<Long> = _grupoId.asStateFlow()
+
     init {
         carregarHistoricoPartidas()
     }
@@ -39,6 +43,25 @@ class HistoricoViewModel @Inject constructor(
         viewModelScope.launch {
             historicoRepository.getHistoricoPartidas().collect { partidas ->
                 partidasOriginais = partidas
+                aplicarOrdenacao()
+            }
+        }
+    }
+
+    // Método para definir o ID do grupo atual e filtrar o histórico
+    fun setGrupoId(id: Long) {
+        _grupoId.value = id
+        carregarHistoricoPartidasFiltradas(id)
+    }
+
+    // Carregar partidas e filtrar pelo grupo atual
+    private fun carregarHistoricoPartidasFiltradas(grupoId: Long) {
+        viewModelScope.launch {
+            // Como ainda não temos o campo grupoId no modelo de partidas do histórico,
+            // vamos carregar todas as partidas por enquanto
+            // Em uma futura atualização, você deve adicionar o campo grupoId ao modelo de partidas
+            historicoRepository.getHistoricoPartidas().collect { todasPartidas ->
+                partidasOriginais = todasPartidas
                 aplicarOrdenacao()
             }
         }

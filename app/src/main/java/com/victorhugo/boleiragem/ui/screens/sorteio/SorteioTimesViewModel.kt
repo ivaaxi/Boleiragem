@@ -10,10 +10,7 @@ import com.victorhugo.boleiragem.data.repository.SorteioRepository
 import com.victorhugo.boleiragem.domain.SorteioUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,7 +22,19 @@ class SorteioTimesViewModel @Inject constructor(
     private val sorteioUseCase: SorteioUseCase
 ) : ViewModel() {
 
-    val jogadores = jogadorRepository.getJogadores()
+    // StateFlow para armazenar o ID do grupo atual
+    private val _grupoId = MutableStateFlow(-1L)
+
+    // Agora jogadores é derivado do grupoId
+    val jogadores = _grupoId.flatMapLatest { grupoId ->
+        if (grupoId > 0) {
+            jogadorRepository.getJogadoresPorGrupo(grupoId)
+        } else {
+            // Fallback para compatibilidade, mas não deve ser usado
+            MutableStateFlow(emptyList())
+        }
+    }
+
     val configuracao = configuracaoRepository.getConfiguracao()
     val resultadoSorteio = sorteioRepository.resultadoSorteio
     val loading = sorteioRepository.sorteioEmAndamento
@@ -51,6 +60,14 @@ class SorteioTimesViewModel @Inject constructor(
     // Lista de jogadores que participaram do último sorteio
     private val _jogadoresSorteados = mutableStateListOf<Long>()
 
+    // StateFlow para a configuração selecionada atualmente
+    private val _configuracaoSelecionada = MutableStateFlow<ConfiguracaoSorteio?>(null)
+    val configuracaoSelecionada: StateFlow<ConfiguracaoSorteio?> = _configuracaoSelecionada
+
+    // Flag para indicar que a configuração foi alterada
+    private val _configuracaoAlterada = MutableStateFlow(false)
+    val configuracaoAlterada: StateFlow<Boolean> = _configuracaoAlterada
+
     init {
         // Inicializamos os jogadores selecionados
         viewModelScope.launch {
@@ -72,20 +89,7 @@ class SorteioTimesViewModel @Inject constructor(
 
         // Carrega a configuração para o dropdown
         viewModelScope.launch {
-            configuracaoRepository.getConfiguracao().collect { config ->
-                if (config != null) {
-                    // Como ainda não temos múltiplos perfis implementados,
-                    // vamos simular alguns perfis diferentes para o dropdown
-                    _configuracoesDisponiveis.clear()
-
-                    // Adiciona o perfil padrão (o que está salvo)
-                    _configuracoesDisponiveis.add(config.copy(nome = "Padrão", isPadrao = true))
-                }
-            }
-        }
-
-        // Carrega as configurações disponíveis para o dropdown
-        viewModelScope.launch {
+            // Carrega as configurações disponíveis para o dropdown
             configuracaoRepository.getTodasConfiguracoes().collect { configuracoes ->
                 _configuracoesDisponiveis.clear()
                 _configuracoesDisponiveis.addAll(configuracoes)
@@ -95,11 +99,13 @@ class SorteioTimesViewModel @Inject constructor(
 
     // Método para selecionar uma configuração
     fun selecionarConfiguracao(config: ConfiguracaoSorteio) {
-        // Em um cenário real, você salvaria essa configuração no repositório
-        // Por enquanto apenas simulamos a seleção mantendo a configuração atual
-        // Aqui seria o lugar para implementar a lógica de salvar a nova configuração
         viewModelScope.launch {
-            configuracaoRepository.salvarConfiguracao(config)
+            // Define esta configuração como a selecionada (mas não como padrão)
+            // Isso permite mudar a configuração sem alterar a padrão do sistema
+            _configuracaoSelecionada.value = config
+
+            // Notifica o sistema que a configuração foi alterada
+            _configuracaoAlterada.value = true
         }
     }
 
@@ -175,8 +181,10 @@ class SorteioTimesViewModel @Inject constructor(
                 _jogadoresSorteados.clear()
                 _jogadoresSorteados.addAll(jogadoresSelecionados)
 
-                // Obtém a configuração atual do repositório
-                val config = configuracaoRepository.getConfiguracao().first()
+                // Obtém a configuração adequada para o sorteio:
+                // Usa a configuração selecionada pelo usuário, se disponível
+                // Caso contrário, usa a configuração padrão do repositório
+                val config = _configuracaoSelecionada.value ?: configuracaoRepository.getConfiguracao().first()
                 val jogadoresList = jogadorRepository.getJogadores().first()
                     .filter { jogador -> jogadoresSelecionados.contains(jogador.id) }
 
@@ -225,5 +233,21 @@ class SorteioTimesViewModel @Inject constructor(
 
     fun abrirConfiguracoes() {
         // Aqui poderia navegar para a tela de configurações
+    }
+
+    // Método para definir o ID do grupo atual
+    fun setGrupoId(id: Long) {
+        _grupoId.value = id
+
+        // Ao mudar de grupo, precisamos reinicializar os jogadores selecionados
+        viewModelScope.launch {
+            jogadores.collect { jogadoresLista ->
+                // Inicializa com jogadores ativos E disponíveis do grupo atual
+                jogadoresSelecionados.clear()
+                jogadoresSelecionados.addAll(
+                    jogadoresLista.filter { it.ativo && it.disponivel }.map { it.id }
+                )
+            }
+        }
     }
 }

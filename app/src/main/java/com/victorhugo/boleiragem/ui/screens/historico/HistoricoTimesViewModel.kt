@@ -61,6 +61,10 @@ class HistoricoTimesViewModel @Inject constructor(
     // Mapa para armazenar estatísticas temporárias dos jogadores até que a pelada seja finalizada
     private val estatisticasTemporariasJogadores = mutableMapOf<Long, EstatisticasTemporarias>()
 
+    // Estado para armazenar o ID do grupo atual
+    private val _grupoId = MutableStateFlow(-1L)
+    val grupoId: StateFlow<Long> = _grupoId.asStateFlow()
+
     init {
         carregarHistoricoTimes()
     }
@@ -456,5 +460,23 @@ class HistoricoTimesViewModel @Inject constructor(
         _modoSubstituicaoTimeReserva.value = true
         // Mostrar o diálogo de transferência
         _mostrarDialogoTransferencia.value = true
+    }
+
+    // Método para definir o ID do grupo atual
+    fun setGrupoId(id: Long) {
+        _grupoId.value = id
+        // Recarregar os dados para o grupo específico
+        carregarHistoricoTimes(id)
+    }
+
+    // Método para carregar os times do histórico com base no ID do grupo
+    private fun carregarHistoricoTimes(grupoId: Long) {
+        viewModelScope.launch {
+            // Obter apenas os times da última pelada do grupo atual
+            sorteioRepository.getTimesUltimaPeladaPorGrupo(grupoId).collect { historicoTimes ->
+                _historicoTimes.value = historicoTimes
+                carregarJogadoresPorTime(historicoTimes)
+            }
+        }
     }
 }

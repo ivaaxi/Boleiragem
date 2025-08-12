@@ -36,8 +36,14 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimesAtuaisScreen(
-    viewModel: HistoricoTimesViewModel = hiltViewModel()
+    viewModel: HistoricoTimesViewModel = hiltViewModel(),
+    grupoId: Long = -1L // Adicionando parâmetro grupoId
 ) {
+    // Efeito para definir o ID do grupo quando a tela é carregada
+    LaunchedEffect(grupoId) {
+        viewModel.setGrupoId(grupoId)
+    }
+
     val historicoTimes by viewModel.historicoTimes.collectAsState(initial = emptyList())
     val peladaFinalizada by viewModel.peladaFinalizada.collectAsState()
     val jogadoresPorTime by viewModel.jogadoresPorTime.collectAsState()
