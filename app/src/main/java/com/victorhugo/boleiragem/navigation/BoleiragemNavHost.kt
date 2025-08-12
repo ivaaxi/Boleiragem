@@ -63,12 +63,21 @@ fun BoleiragemNavHost(
 
         // Tela de resultado do sorteio (sem bottom navigation)
         composable(
-            route = NavDestinations.ResultadoSorteio.route
+            route = NavDestinations.ResultadoSorteio.route, // Rota já inclui /{isSorteioRapido}
+            arguments = listOf(
+                navArgument("isSorteioRapido") {
+                    type = NavType.BoolType
+                    defaultValue = false // Sorteios normais são o padrão
+                }
+            )
         ) {
+            // O ResultadoSorteioViewModel pegará 'isSorteioRapido' do SavedStateHandle
             ResultadoSorteioScreen(
                 onBackClick = {
                     navController.navigateUp()
                 }
+                // onConfirmarClick e onCancelarClick usam os padrões da tela,
+                // que chamam onBackClick. O ViewModel lida com a lógica de confirmação/cancelamento.
             )
         }
 

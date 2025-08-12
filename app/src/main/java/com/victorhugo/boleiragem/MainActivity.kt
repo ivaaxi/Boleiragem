@@ -1,3 +1,4 @@
+
 package com.victorhugo.boleiragem
 
 import android.Manifest
@@ -8,14 +9,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -38,10 +41,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.victorhugo.boleiragem.navigation.BoleiragemBottomNavigationBar
 import com.victorhugo.boleiragem.navigation.NavDestinations
 import com.victorhugo.boleiragem.ui.screens.cadastro.CadastroJogadoresScreen
@@ -76,15 +84,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Reativando a splash screen agora que o problema dos ícones foi corrigido
         installSplashScreen()
-
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        // Solicitar permissões de localização ao iniciar o app
         requestLocationPermissions()
-
         setContent {
             BoleiragemTheme {
                 BoleiragemApp()
@@ -103,7 +106,6 @@ class MainActivity : ComponentActivity() {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
 
-            // Se ainda não temos permissão, solicitar
             if (!hasLocationPermission) {
                 locationPermissionLauncher.launch(
                     arrayOf(
@@ -118,62 +120,94 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun BoleiragemApp() {
-    // Estado para controlar a exibição da SplashScreen
     var showSplashScreen by remember { mutableStateOf(true) }
-    // Estado para controlar a exibição da tela de login
     var showLoginScreen by remember { mutableStateOf(false) }
-    // Estado para controlar a exibição da tela de grupos
     var showGruposScreen by remember { mutableStateOf(false) }
-    // Estado para armazenar o ID do grupo selecionado
+    var showResultadoSorteioRapido by remember { mutableStateOf(false) } // Nova flag de estado
     var grupoSelecionadoId by remember { mutableStateOf(-1L) }
-    // Estado para armazenar o nome do grupo selecionado
     var grupoSelecionadoNome by remember { mutableStateOf("") }
 
     when {
         showSplashScreen -> {
-            // Mostrar a SplashScreen enquanto o aplicativo está inicializando
             SplashScreen(onNavigateToHome = {
-                // Quando a SplashScreen terminar, mostrar a tela de login
                 showSplashScreen = false
                 showLoginScreen = true
             })
         }
         showLoginScreen -> {
-            // Mostrar a tela de login
             LoginScreen(
                 onLoginClick = {
-                    // Quando o usuário fizer login, mostrar a tela de grupos
                     showLoginScreen = false
                     showGruposScreen = true
                 },
                 onEntrarSemContaClick = {
-                    // Quando o usuário entrar sem conta, mostrar a tela de grupos
                     showLoginScreen = false
                     showGruposScreen = true
                 }
             )
         }
         showGruposScreen -> {
-            // Mostrar a tela de grupos
-            val navController = rememberNavController()
+            // val navController = rememberNavController() // NavController local não é mais necessário aqui para este propósito
             GruposPeladaScreen(
                 onGrupoSelecionado = { grupoId, grupoNome ->
-                    // Quando um grupo for selecionado, mostrar o conteúdo principal
                     grupoSelecionadoId = grupoId
                     grupoSelecionadoNome = grupoNome
                     showGruposScreen = false
+                    // MainScreen será mostrada no 'else'
                 },
-                navController = navController
+                onNavigateToSorteioResultado = { isSorteioRapidoValue ->
+                    if (isSorteioRapidoValue) {
+                        showGruposScreen = false
+                        showResultadoSorteioRapido = true
+                    }
+                    // Se precisar lidar com !isSorteioRapidoValue, adicione lógica aqui
+                }
+                // navController = navController // Removido
             )
         }
+        showResultadoSorteioRapido -> {
+            val tempNavController = rememberNavController()
+            NavHost(
+                navController = tempNavController,
+                startDestination = "placeholder_resultado_sorteio" // Rota inicial temporária
+            ) {
+                composable("placeholder_resultado_sorteio") {
+                    // Pode ser um Box vazio ou um indicador de carregamento,
+                    // já que vamos navegar imediatamente.
+                    Box(modifier = Modifier.fillMaxSize())
+                }
+                composable(
+                    route = NavDestinations.ResultadoSorteio.route, // Rota real: "resultado_sorteio/{isSorteioRapido}"
+                    arguments = listOf(navArgument("isSorteioRapido") { type = NavType.BoolType })
+                ) {
+                    // ResultadoSorteioViewModel pegará 'isSorteioRapido' do SavedStateHandle
+                    ResultadoSorteioScreen(
+                        onBackClick = {
+                            showResultadoSorteioRapido = false
+                            showGruposScreen = true // Voltar para a tela de grupos
+                        }
+                        // onConfirmarClick e onCancelarClick usam os padrões da tela,
+                        // que chamam onBackClick. Para sorteio rápido, isso significa voltar para Grupos.
+                    )
+                }
+            }
+            // Navega para a tela de resultado após o NavHost ser composto
+            LaunchedEffect(Unit) {
+                tempNavController.navigate(NavDestinations.ResultadoSorteio.createRoute(isSorteioRapido = true)) {
+                    popUpTo("placeholder_resultado_sorteio") { inclusive = true } // Remove o placeholder do backstack
+                }
+            }
+        }
         else -> {
-            // Mostrar o conteúdo principal do aplicativo
+            // Mostrar o conteúdo principal do aplicativo (MainScreen)
+            // Isso acontece se nenhuma das flags acima for true (ex: grupo foi selecionado)
             MainScreen(
                 grupoId = grupoSelecionadoId,
                 grupoNome = grupoSelecionadoNome,
                 onVoltarParaGerenciamento = {
-                    // Voltar para a tela de gerenciamento de peladas
                     showGruposScreen = true
+                    // Outras flags como showResultadoSorteioRapido devem ser false aqui
+                    showResultadoSorteioRapido = false
                 }
             )
         }
@@ -184,54 +218,34 @@ fun BoleiragemApp() {
 @Composable
 fun MainScreen(
     grupoId: Long = -1L,
-    grupoNome: String = "", // Adicionando parâmetro para o nome do grupo
+    grupoNome: String = "",
     onVoltarParaGerenciamento: () -> Unit = {}
 ) {
-    // Estados para controlar a navegação
-    val navController = rememberNavController()
+    val navController = rememberNavController() // NavController para o Pager e navegação interna do MainScreen
     val scope = rememberCoroutineScope()
-
-    // Estado para controlar qual tela principal está sendo exibida (0, 1, 2 ou 3)
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-
-    // Configuração do pager
     val pagerState = rememberPagerState(
         initialPage = selectedTabIndex,
-        pageCount = { 6 } // Agora 6 abas principais (incluindo a nova aba de estatísticas)
+        pageCount = { 6 }
     )
 
-    // Efeito para sincronizar o selectedTabIndex com a página atual do pager
     LaunchedEffect(pagerState.currentPage) {
         selectedTabIndex = pagerState.currentPage
     }
 
-    // Função para navegar programaticamente para uma aba específica
     val navigateToTab = { tabIndex: Int ->
         scope.launch {
             pagerState.animateScrollToPage(tabIndex)
         }
     }
 
-    // Define se estamos em uma tela secundária (detalhes ou resultado)
     var isSecondaryScreen by remember { mutableStateOf(false) }
     var secondaryScreenContent by remember { mutableStateOf<@Composable () -> Unit>({}) }
 
-    // Lista de destinos principais para navegação
-    val mainScreenTabs = listOf(
-        NavDestinations.CadastroJogadores.route,
-        NavDestinations.ConfiguracaoTimes.route,
-        NavDestinations.SorteioTimes.route,
-        NavDestinations.TimesAtuais.route,
-        NavDestinations.Historico.route,
-        NavDestinations.Estatisticas.route
-    )
-
-    // Scaffold com a barra de navegação inferior
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             if (!isSecondaryScreen) {
-                // Barra superior compacta como "Minhas Peladas"
                 TopAppBar(
                     title = {
                         Text(
@@ -239,7 +253,7 @@ fun MainScreen(
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.fillMaxWidth(),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Start // Alinhamento à esquerda
+                            textAlign = TextAlign.Start
                         )
                     },
                     navigationIcon = {
@@ -256,17 +270,16 @@ fun MainScreen(
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
                         navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                     ),
-                    modifier = Modifier.height(56.dp) // Altura padrão reduzida
+                    modifier = Modifier.height(56.dp)
                 )
             }
         },
         bottomBar = {
             if (!isSecondaryScreen) {
                 BoleiragemBottomNavigationBar(
-                    navController = navController,
+                    navController = navController, // Este navController é para as abas
                     currentTab = selectedTabIndex,
                     onTabSelected = { index ->
-                        // Atualiza o índice e anima o pager
                         selectedTabIndex = index
                         scope.launch {
                             pagerState.animateScrollToPage(index)
@@ -277,10 +290,8 @@ fun MainScreen(
         }
     ) { innerPadding ->
         if (isSecondaryScreen) {
-            // Se estamos em uma tela secundária, mostrar o conteúdo correspondente
             secondaryScreenContent()
         } else {
-            // Caso contrário, mostrar o ViewPager com as telas principais
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -289,13 +300,12 @@ fun MainScreen(
             ) { page ->
                 when (page) {
                     0 -> {
-                        // Usando Box com contentAlignment para garantir que o FloatingActionButton apareça
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             CadastroJogadoresScreen(
-                                grupoId = grupoId, // Passando o ID do grupo selecionado
+                                grupoId = grupoId,
                                 onNavigateToDetalheJogador = { jogadorId ->
                                     isSecondaryScreen = true
                                     secondaryScreenContent = {
@@ -311,7 +321,7 @@ fun MainScreen(
                         }
                     }
                     1 -> ConfiguracaoTimesScreen(
-                        grupoId = grupoId, // Passando o ID do grupo selecionado
+                        grupoId = grupoId,
                         onNavigateToConfiguracaoPontuacao = {
                             isSecondaryScreen = true
                             secondaryScreenContent = {
@@ -326,7 +336,7 @@ fun MainScreen(
                             isSecondaryScreen = true
                             secondaryScreenContent = {
                                 GerenciadorPerfisScreen(
-                                    grupoId = grupoId, // Passando o ID do grupo selecionado
+                                    grupoId = grupoId,
                                     onNavigateBack = {
                                         isSecondaryScreen = false
                                     }
@@ -334,41 +344,31 @@ fun MainScreen(
                             }
                         }
                     )
-                    2 -> SorteioTimesScreen(
-                        grupoId = grupoId, // Passando o ID do grupo selecionado
+                    2 -> SorteioTimesScreen( // Sorteio normal (não rápido)
+                        grupoId = grupoId,
                         onSorteioRealizado = {
-                            // Mostra a tela de resultado do sorteio
                             isSecondaryScreen = true
                             secondaryScreenContent = {
+                                // ViewModel é pego via hiltViewModel() e SavedStateHandle (isSorteioRapido = false por padrão)
                                 ResultadoSorteioScreen(
                                     onBackClick = {
                                         isSecondaryScreen = false
                                     },
                                     onConfirmarClick = {
-                                        // O ViewModel é fornecido diretamente na tela ResultadoSorteioScreen
-                                        // através do parâmetro viewModel = hiltViewModel()
-
-                                        // Fecha a tela de resultado e navega para a aba de Times
                                         isSecondaryScreen = false
-                                        navigateToTab(3)
+                                        navigateToTab(3) // Navega para a aba Times Atuais
                                     },
                                     onCancelarClick = {
-                                        // O ViewModel é fornecido diretamente na tela ResultadoSorteioScreen
-
-                                        // Volta para a tela de sorteio
-                                        isSecondaryScreen = false
+                                        isSecondaryScreen = false // Volta para SorteioTimesScreen
                                     }
                                 )
                             }
                         },
-                        onNavigateToHistorico = {
-                            // Esta função não será mais usada para navegação automática
-                            // já que agora temos o botão de confirmar
-                        }
+                        onNavigateToHistorico = { /* Não usado para navegação automática */ }
                     )
-                    3 -> TimesAtuaisScreen() // Tela de times atuais
-                    4 -> HistoricoScreen() // Nova tela de histórico
-                    5 -> EstatisticasScreen() // Tela de estatísticas
+                    3 -> TimesAtuaisScreen()
+                    4 -> HistoricoScreen()
+                    5 -> EstatisticasScreen()
                 }
             }
         }

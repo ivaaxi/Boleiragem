@@ -24,7 +24,9 @@ sealed class NavDestinations(val route: String) {
         fun createRoute(jogadorId: Long) = "detalhe_jogador/$jogadorId"
     }
 
-    object ResultadoSorteio : NavDestinations("resultado_sorteio")
+    object ResultadoSorteio : NavDestinations("resultado_sorteio/{isSorteioRapido}") {
+        fun createRoute(isSorteioRapido: Boolean) = "resultado_sorteio/$isSorteioRapido"
+    }
 
      // Rota para gerenciamento de perfis de configuração com ID do grupo
     object GerenciadorPerfis : NavDestinations("gerenciador_perfis/{grupoId}") {

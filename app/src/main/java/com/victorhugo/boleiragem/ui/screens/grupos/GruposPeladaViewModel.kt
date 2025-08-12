@@ -1,490 +1,419 @@
 package com.victorhugo.boleiragem.ui.screens.grupos
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
 import com.victorhugo.boleiragem.data.model.DiaSemana
 import com.victorhugo.boleiragem.data.model.GrupoPelada
+import com.victorhugo.boleiragem.data.model.Jogador
+import com.victorhugo.boleiragem.data.model.ResultadoSorteio
 import com.victorhugo.boleiragem.data.model.TipoRecorrencia
+import com.victorhugo.boleiragem.data.model.Time
+import com.victorhugo.boleiragem.data.repository.ConfiguracaoRepository
 import com.victorhugo.boleiragem.data.repository.GrupoPeladaRepository
 import com.victorhugo.boleiragem.data.repository.JogadorRepository
+import com.victorhugo.boleiragem.data.repository.SorteioRepository
+import com.victorhugo.boleiragem.domain.SorteioUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-/**
- * Tipos de visualização possíveis para a lista de grupos
- */
-enum class TipoVisualizacao {
-    LISTA,       // Lista vertical tradicional
-    CARDS,       // Cards retangulares (3 por linha)
-    MINIMALISTA  // Ícones arredondados com nome abaixo
-}
+enum class TipoVisualizacao { LISTA, CARDS, MINIMALISTA }
 
 @HiltViewModel
 class GruposPeladaViewModel @Inject constructor(
     private val grupoPeladaRepository: GrupoPeladaRepository,
-    private val jogadorRepository: JogadorRepository
+    private val jogadorRepository: JogadorRepository,
+    private val configuracaoRepository: ConfiguracaoRepository,
+    private val sorteioUseCase: SorteioUseCase,
+    private val sorteioRepository: SorteioRepository
 ) : ViewModel() {
 
-    // Estado para armazenar os grupos de pelada ativos
     private val _grupos = MutableStateFlow<List<GrupoPelada>>(emptyList())
     val grupos: StateFlow<List<GrupoPelada>> = _grupos.asStateFlow()
 
-    // Estado para controlar o tipo de visualização
+    private val _jogadoresPorGrupo = MutableStateFlow<Map<Long, Int>>(emptyMap())
+    val jogadoresPorGrupo: StateFlow<Map<Long, Int>> = _jogadoresPorGrupo.asStateFlow()
+
     private val _tipoVisualizacao = MutableStateFlow(TipoVisualizacao.LISTA)
     val tipoVisualizacao: StateFlow<TipoVisualizacao> = _tipoVisualizacao.asStateFlow()
 
-    // Estado para controlar o carregamento
-    private val _carregando = MutableStateFlow(true)
+    private val _carregando = MutableStateFlow(false)
     val carregando: StateFlow<Boolean> = _carregando.asStateFlow()
 
-    // Estado para controlar o diálogo de criação/edição
-    private val _mostrarDialogo = MutableStateFlow(false)
-    val mostrarDialogo: StateFlow<Boolean> = _mostrarDialogo.asStateFlow()
+    private val _mostrarDialogoGrupo = MutableStateFlow(false)
+    val mostrarDialogoGrupo: StateFlow<Boolean> = _mostrarDialogoGrupo.asStateFlow()
 
-    // Estado para controlar o grupo em edição
     private val _grupoEmEdicao = MutableStateFlow<GrupoPelada?>(null)
     val grupoEmEdicao: StateFlow<GrupoPelada?> = _grupoEmEdicao.asStateFlow()
 
-    // Estados para o sorteio rápido
-    private val _mostrarDialogSorteioRapido = MutableStateFlow(false)
-    val mostrarDialogSorteioRapido: StateFlow<Boolean> = _mostrarDialogSorteioRapido.asStateFlow()
-
-    private val _mostrarDialogSelecaoPelada = MutableStateFlow(false)
-    val mostrarDialogSelecaoPelada: StateFlow<Boolean> = _mostrarDialogSelecaoPelada.asStateFlow()
-
-    private val _mostrarDialogOpcoesPelada = MutableStateFlow(false)
-    val mostrarDialogOpcoesPelada: StateFlow<Boolean> = _mostrarDialogOpcoesPelada.asStateFlow()
-
-    private val _peladaSelecionadaId = MutableStateFlow<Long?>(null)
-    val peladaSelecionadaId: StateFlow<Long?> = _peladaSelecionadaId.asStateFlow()
-
-    // Estado para controlar o seletor de mapas
     private val _mostrarSeletorMapas = MutableStateFlow(false)
     val mostrarSeletorMapas: StateFlow<Boolean> = _mostrarSeletorMapas.asStateFlow()
 
-    // Estado para controlar o compartilhamento
-    private val _mostrarTelaCompartilhamento = MutableStateFlow(false)
-    val mostrarTelaCompartilhamento: StateFlow<Boolean> = _mostrarTelaCompartilhamento.asStateFlow()
-
-    // Estado para controlar o grupo para compartilhar
-    private val _grupoParaCompartilhar = MutableStateFlow<GrupoPelada?>(null)
-    val grupoParaCompartilhar: StateFlow<GrupoPelada?> = _grupoParaCompartilhar.asStateFlow()
-
-    // Estado para controlar o retorno do mapa
     private val _retornandoDoMapa = MutableStateFlow(false)
     val retornandoDoMapa: StateFlow<Boolean> = _retornandoDoMapa.asStateFlow()
 
-    // Dados temporários para armazenar localização selecionada
     private var localSelecionadoLatitude: Double? = null
     private var localSelecionadoLongitude: Double? = null
     private var localSelecionadoEndereco: String? = null
     private var localSelecionadoNome: String? = null
 
-    // Estado para armazenar o número de jogadores por grupo
-    private val _jogadoresPorGrupo = MutableStateFlow<Map<Long, Int>>(emptyMap())
-    val jogadoresPorGrupo: StateFlow<Map<Long, Int>> = _jogadoresPorGrupo.asStateFlow()
+    private val _grupoParaCompartilhar = MutableStateFlow<GrupoPelada?>(null)
+    val grupoParaCompartilhar: StateFlow<GrupoPelada?> = _grupoParaCompartilhar.asStateFlow()
+
+    private val _mostrarTelaCompartilhamento = MutableStateFlow(false)
+    val mostrarTelaCompartilhamento: StateFlow<Boolean> = _mostrarTelaCompartilhamento.asStateFlow()
+
+    private val _mostrarDialogoConfigSorteioRapido = MutableStateFlow(false)
+    val mostrarDialogoConfigSorteioRapido: StateFlow<Boolean> = _mostrarDialogoConfigSorteioRapido.asStateFlow()
+
+    private val _grupoSelecionadoParaSorteioRapido = MutableStateFlow<GrupoPelada?>(null)
+    val grupoSelecionadoParaSorteioRapido: StateFlow<GrupoPelada?> = _grupoSelecionadoParaSorteioRapido.asStateFlow()
+
+    private val _jogadoresAtivosParaDialogoSorteioRapido = MutableStateFlow(0)
+    val jogadoresAtivosParaDialogoSorteioRapido: StateFlow<Int> = _jogadoresAtivosParaDialogoSorteioRapido.asStateFlow()
+
+    private val _perfisConfiguracaoSorteio = MutableStateFlow<List<ConfiguracaoSorteio>>(emptyList())
+    val perfisConfiguracaoSorteio: StateFlow<List<ConfiguracaoSorteio>> = _perfisConfiguracaoSorteio.asStateFlow()
+
+    private val _usarPerfilExistenteSorteioRapido = MutableStateFlow(false)
+    val usarPerfilExistenteSorteioRapido: StateFlow<Boolean> = _usarPerfilExistenteSorteioRapido.asStateFlow()
+
+    private val _perfilConfigSelecionadoSorteioRapido = MutableStateFlow<ConfiguracaoSorteio?>(null)
+    val perfilConfigSelecionadoSorteioRapido: StateFlow<ConfiguracaoSorteio?> = _perfilConfigSelecionadoSorteioRapido.asStateFlow()
+
+    private val _jogadoresPorTimeSorteioRapido = MutableStateFlow(5)
+    val jogadoresPorTimeSorteioRapido: StateFlow<Int> = _jogadoresPorTimeSorteioRapido.asStateFlow()
+
+    private val _numeroDeTimesSorteioRapido = MutableStateFlow(2)
+    val numeroDeTimesSorteioRapido: StateFlow<Int> = _numeroDeTimesSorteioRapido.asStateFlow()
+
+    private val _navegarParaResultadoSorteio = MutableStateFlow<Boolean?>(null)
+    val navegarParaResultadoSorteio: StateFlow<Boolean?> = _navegarParaResultadoSorteio.asStateFlow()
+
+    private val _erroSorteioRapido = MutableStateFlow<String?>(null)
+    val erroSorteioRapido: StateFlow<String?> = _erroSorteioRapido.asStateFlow()
+
+    private val _podeRealizarSorteioRapido = MutableStateFlow(false)
+    val podeRealizarSorteioRapido: StateFlow<Boolean> = _podeRealizarSorteioRapido.asStateFlow()
 
     init {
         carregarGrupos()
-        carregarJogadoresPorGrupo()
     }
 
-    /**
-     * Carrega todos os grupos de pelada ativos
-     */
     fun carregarGrupos() {
         viewModelScope.launch {
             _carregando.value = true
             try {
-                // Coleta os resultados do Flow para uma lista
                 grupoPeladaRepository.getTodosGrupos().collect { gruposLista ->
                     _grupos.value = gruposLista
-                    _carregando.value = false
-                    // Atualiza o mapeamento de jogadores após carregar os grupos
                     atualizarJogadoresPorGrupo()
+                    _carregando.value = false
                 }
             } catch (e: Exception) {
-                // Tratar erro de carregamento
-                e.printStackTrace()
+                Log.e("GruposVM", "Erro ao carregar grupos", e)
                 _carregando.value = false
             }
         }
     }
 
-    /**
-     * Altera o tipo de visualização da lista de grupos
-     */
-    fun alterarTipoVisualizacao(tipo: TipoVisualizacao) {
-        _tipoVisualizacao.value = tipo
+    private fun atualizarJogadoresPorGrupo() {
+        viewModelScope.launch {
+            val mapaContagem = mutableMapOf<Long, Int>()
+            _grupos.value.forEach { grupo ->
+                mapaContagem[grupo.id] = jogadorRepository.countJogadoresAtivosPorGrupo(grupo.id)
+            }
+            _jogadoresPorGrupo.value = mapaContagem
+            _grupoSelecionadoParaSorteioRapido.value?.let { grupoAtual ->
+                 _jogadoresAtivosParaDialogoSorteioRapido.value = _jogadoresPorGrupo.value[grupoAtual.id] ?: 0
+                validarConfiguracaoSorteioRapido()
+            }
+        }
     }
 
-    /**
-     * Exibe o diálogo para criar um novo grupo de pelada
-     */
-    fun mostrarDialogoCriarGrupo() {
+    fun alterarTipoVisualizacao(tipo: TipoVisualizacao) { _tipoVisualizacao.value = tipo }
+    fun mostrarDialogoCriarGrupo() { _grupoEmEdicao.value = null; _mostrarDialogoGrupo.value = true }
+    fun mostrarDialogoEditarGrupo(grupo: GrupoPelada) { _grupoEmEdicao.value = grupo; _mostrarDialogoGrupo.value = true }
+    fun fecharDialogoGrupo() {
+        _mostrarDialogoGrupo.value = false
         _grupoEmEdicao.value = null
-        _mostrarDialogo.value = true
-    }
-
-    /**
-     * Exibe o diálogo para editar um grupo existente
-     */
-    fun mostrarDialogoEditarGrupo(grupo: GrupoPelada) {
-        _grupoEmEdicao.value = grupo
-        _mostrarDialogo.value = true
-    }
-
-    /**
-     * Fecha o diálogo de criação/edição
-     */
-    fun fecharDialogo() {
-        _mostrarDialogo.value = false
-        _grupoEmEdicao.value = null
-        // Limpar dados de localização
         localSelecionadoLatitude = null
         localSelecionadoLongitude = null
         localSelecionadoEndereco = null
         localSelecionadoNome = null
     }
 
-    /**
-     * Salva um grupo de pelada (novo ou existente)
-     */
     fun salvarGrupo(
-        nome: String,
-        local: String,
-        horario: String,
-        imagemUrl: String?,
-        descricao: String?,
-        tipoRecorrencia: TipoRecorrencia,
-        diaSemana: DiaSemana?,
-        latitude: Double?,
-        longitude: Double?,
-        endereco: String?,
-        localNome: String?,
-        diasSemana: List<DiaSemana> = emptyList()
+        nome: String, local: String, horario: String, imagemUrl: String?, descricao: String?,
+        tipoRecorrencia: TipoRecorrencia, diaSemana: DiaSemana?, latitude: Double?, longitude: Double?,
+        endereco: String?, localNome: String?, diasSemana: List<DiaSemana> = emptyList()
     ) {
-        println("DEBUG: Iniciando método salvarGrupo - nome: $nome, tipo: $tipoRecorrencia")
-        
         viewModelScope.launch {
             try {
-                // Log para debug: início da tentativa de salvar
-                println("DEBUG: Processando salvamento de grupo: $nome")
-
-                // Criar ou atualizar o grupo
                 val grupoAtual = _grupoEmEdicao.value
-
                 val diasSemanaFinal = if (tipoRecorrencia == TipoRecorrencia.RECORRENTE) {
-                    // Se for recorrente, usa a lista de dias fornecida
-                    if (diasSemana.isEmpty() && diaSemana != null) {
-                        // Fallback para compatibilidade
-                        listOf(diaSemana)
-                    } else {
-                        diasSemana
-                    }
+                    if (diasSemana.isEmpty() && diaSemana != null) listOf(diaSemana) else diasSemana
                 } else {
-                    // Se não for recorrente, usa apenas o dia principal
                     if (diaSemana != null) listOf(diaSemana) else emptyList()
                 }
-
-                val grupo = grupoAtual?.copy(
-                    nome = nome,
-                    local = local,
-                    horario = horario,
-                    imagemUrl = imagemUrl,
-                    descricao = descricao,
-                    tipoRecorrencia = tipoRecorrencia,
-                    diaSemana = diaSemana ?: DiaSemana.DOMINGO, // Valor padrão para evitar nulos
-                    diasSemana = diasSemanaFinal,
-                    latitude = latitude,
-                    longitude = longitude,
-                    endereco = endereco,
-                    localNome = localNome,
-                    ultimaModificacao = System.currentTimeMillis()
+                val grupoSalvar = grupoAtual?.copy(
+                    nome = nome, local = local, horario = horario, imagemUrl = imagemUrl, descricao = descricao,
+                    tipoRecorrencia = tipoRecorrencia, diaSemana = diaSemana ?: DiaSemana.DOMINGO,
+                    diasSemana = diasSemanaFinal, latitude = latitude, longitude = longitude, endereco = endereco,
+                    localNome = localNome, ultimaModificacao = System.currentTimeMillis()
                 ) ?: GrupoPelada(
-                    id = 0, // O repositório atribuirá um ID
-                    nome = nome,
-                    local = local,
-                    horario = horario,
-                    imagemUrl = imagemUrl,
-                    descricao = descricao,
-                    tipoRecorrencia = tipoRecorrencia,
-                    diaSemana = diaSemana ?: DiaSemana.DOMINGO, // Valor padrão para evitar nulos
-                    diasSemana = diasSemanaFinal,
-                    latitude = latitude,
-                    longitude = longitude,
-                    endereco = endereco,
-                    localNome = localNome,
-                    dataCriacao = System.currentTimeMillis(),
-                    ultimaModificacao = System.currentTimeMillis(),
-                    ativo = true,
-                    jogadoresIds = emptyList(),
-                    usuarioId = "local",
-                    compartilhado = false
+                    id = 0, nome = nome, local = local, horario = horario, imagemUrl = imagemUrl, descricao = descricao,
+                    tipoRecorrencia = tipoRecorrencia, diaSemana = diaSemana ?: DiaSemana.DOMINGO,
+                    diasSemana = diasSemanaFinal, latitude = latitude, longitude = longitude, endereco = endereco,
+                    localNome = localNome, dataCriacao = System.currentTimeMillis(), ultimaModificacao = System.currentTimeMillis(),
+                    ativo = true, jogadoresIds = emptyList(), usuarioId = "local", compartilhado = false
                 )
-
-                // Log para debug: antes de salvar no repositório
-                println("DEBUG: Objeto grupo criado: $grupo")
-
-                // Salvar no repositório
-                if (grupoAtual != null) {
-                    println("DEBUG: Atualizando grupo existente com ID: ${grupoAtual.id}")
-                    grupoPeladaRepository.atualizarGrupo(grupo)
-                } else {
-                    println("DEBUG: Inserindo novo grupo")
-                    val novoId = grupoPeladaRepository.inserirGrupo(grupo)
-                    println("DEBUG: Novo grupo inserido com ID: $novoId")
-                }
-
-                // Fechar o diálogo primeiro
-                _mostrarDialogo.value = false
-                _grupoEmEdicao.value = null
-
-                // Recarregar a lista após um pequeno delay para garantir que foi salvo
-                kotlinx.coroutines.delay(500) // Aumentado o delay para garantir que a transação seja finalizada
-                println("DEBUG: Recarregando lista de grupos após salvar")
+                if (grupoAtual != null) grupoPeladaRepository.atualizarGrupo(grupoSalvar) else grupoPeladaRepository.inserirGrupo(grupoSalvar)
+                fecharDialogoGrupo()
+                kotlinx.coroutines.delay(200)
                 carregarGrupos()
-
-            } catch (e: Exception) {
-                // Tratar erro de salvamento
-                e.printStackTrace()
-                // Log detalhado do erro para debug
-                println("ERRO ao salvar grupo: ${e.message}")
-                println("ERRO detalhado: ${e.stackTraceToString()}")
-            }
+            } catch (e: Exception) { Log.e("GruposVM", "Erro ao salvar grupo", e) }
         }
     }
 
-    /**
-     * Exclui um grupo de pelada
-     */
     fun excluirGrupo(grupo: GrupoPelada) {
         viewModelScope.launch {
-            try {
-                grupoPeladaRepository.excluirGrupo(grupo)
-                // Recarregar a lista
-                carregarGrupos()
-            } catch (e: Exception) {
-                // Tratar erro de exclusão
-                e.printStackTrace()
-            }
+            try { grupoPeladaRepository.excluirGrupo(grupo); carregarGrupos() }
+            catch (e: Exception) { Log.e("GruposVM", "Erro ao excluir grupo", e) }
         }
     }
 
-    /**
-     * Exibe o seletor de mapas
-     */
-    fun mostrarSeletorMapas() {
-        _mostrarSeletorMapas.value = true
+    fun mostrarSeletorMapas() { _mostrarSeletorMapas.value = true }
+    fun ocultarSeletorMapas() { _mostrarSeletorMapas.value = false }
+    fun processarLocalSelecionado(latitude: Double, longitude: Double, endereco: String, nome: String?) {
+        localSelecionadoLatitude = latitude; localSelecionadoLongitude = longitude; localSelecionadoEndereco = endereco; localSelecionadoNome = nome
+        _retornandoDoMapa.value = true; _mostrarSeletorMapas.value = false; _mostrarDialogoGrupo.value = true
     }
-
-    /**
-     * Oculta o seletor de mapas
-     */
-    fun ocultarSeletorMapas() {
-        _mostrarSeletorMapas.value = false
+    fun cancelarSelecaoLocalizacao() { _mostrarSeletorMapas.value = false; _mostrarDialogoGrupo.value = true }
+    fun resetRetornoMapa() { _retornandoDoMapa.value = false }
+    fun obterDadosLocalizacao(): Map<String, Any?> = mapOf("latitude" to localSelecionadoLatitude, "longitude" to localSelecionadoLongitude, "endereco" to localSelecionadoEndereco, "nomeLocal" to localSelecionadoNome)
+    fun salvarLocalizacaoSelecionada(latitude: Double, longitude: Double, endereco: String, nome: String?) {
+        localSelecionadoLatitude = latitude; localSelecionadoLongitude = longitude; localSelecionadoEndereco = endereco; localSelecionadoNome = nome
+        _retornandoDoMapa.value = true; _mostrarSeletorMapas.value = false
     }
+    fun exibirTelaCompartilhamento(grupo: GrupoPelada) { _grupoParaCompartilhar.value = grupo; _mostrarTelaCompartilhamento.value = true }
+    fun ocultarTelaCompartilhamento() { _mostrarTelaCompartilhamento.value = false; _grupoParaCompartilhar.value = null }
 
-    /**
-     * Processa a localização selecionada no mapa
-     */
-    fun processarLocalSelecionado(
-        latitude: Double,
-        longitude: Double,
-        endereco: String,
-        nome: String?
-    ) {
-        localSelecionadoLatitude = latitude
-        localSelecionadoLongitude = longitude
-        localSelecionadoEndereco = endereco
-        localSelecionadoNome = nome
-
-        _retornandoDoMapa.value = true
-        _mostrarSeletorMapas.value = false
-        _mostrarDialogo.value = true
-    }
-
-    /**
-     * Cancela a seleção de localização no mapa
-     */
-    fun cancelarSelecaoLocalizacao() {
-        _mostrarSeletorMapas.value = false
-    }
-
-    /**
-     * Reseta o estado de retorno do mapa
-     */
-    fun resetRetornoMapa() {
-        _retornandoDoMapa.value = false
-    }
-
-    /**
-     * Obtém os dados de localização selecionados
-     */
-    fun obterDadosLocalizacao(): Map<String, Any?> {
-        return mapOf(
-            "latitude" to localSelecionadoLatitude,
-            "longitude" to localSelecionadoLongitude,
-            "endereco" to localSelecionadoEndereco,
-            "nomeLocal" to localSelecionadoNome
-        )
-    }
-
-    /**
-     * Salva a localização selecionada no mapa
-     */
-    fun salvarLocalizacaoSelecionada(
-        latitude: Double,
-        longitude: Double,
-        endereco: String,
-        nome: String?
-    ) {
-        localSelecionadoLatitude = latitude
-        localSelecionadoLongitude = longitude
-        localSelecionadoEndereco = endereco
-        localSelecionadoNome = nome
-
-        _retornandoDoMapa.value = true
-        _mostrarSeletorMapas.value = false
-    }
-
-    /**
-     * Exibe a tela de compartilhamento para um grupo
-     */
-    fun exibirTelaCompartilhamento(grupo: GrupoPelada) {
-        _grupoParaCompartilhar.value = grupo
-        _mostrarTelaCompartilhamento.value = true
-    }
-
-    /**
-     * Oculta a tela de compartilhamento
-     */
-    fun ocultarTelaCompartilhamento() {
-        _mostrarTelaCompartilhamento.value = false
-        _grupoParaCompartilhar.value = null
-    }
-
-    // Métodos para o sorteio rápido
-
-    /**
-     * Mostra o diálogo para escolher entre lista manual e pelada existente,
-     * validando se há grupos de pelada criados
-     */
-    fun mostrarDialogSorteioRapido() {
-        // Sempre exibe o diálogo, mas o conteúdo dele será adaptado
-        // baseado na existência ou não de grupos
-        _mostrarDialogSorteioRapido.value = true
-    }
-
-    /**
-     * Navega diretamente para a tela de sorteio rápido com lista manual
-     */
-    fun navegarDiretamenteParaSorteioRapidoManual(): Boolean {
-        // Se não há peladas criadas, retorna true para indicar que deve
-        // navegar diretamente para a entrada manual
-        return _grupos.value.isEmpty()
-    }
-
-    /**
-     * Fecha o diálogo de sorteio rápido
-     */
-    fun fecharDialogSorteioRapido() {
-        _mostrarDialogSorteioRapido.value = false
-    }
-
-    /**
-     * Mostra o diálogo para selecionar uma pelada existente
-     */
-    fun mostrarDialogSelecaoPelada() {
-        _mostrarDialogSelecaoPelada.value = true
-        _peladaSelecionadaId.value = null // Limpa a seleção anterior
-    }
-
-    /**
-     * Fecha o diálogo de seleção de pelada
-     */
-    fun fecharDialogSelecaoPelada() {
-        _mostrarDialogSelecaoPelada.value = false
-        _peladaSelecionadaId.value = null
-    }
-
-    /**
-     * Seleciona uma pelada para o sorteio rápido
-     */
-    fun selecionarPelada(peladaId: Long) {
-        _peladaSelecionadaId.value = peladaId
-    }
-
-    /**
-     * Mostra o diálogo de opções ao clicar em uma pelada
-     */
-    fun mostrarDialogOpcoesPelada(peladaId: Long) {
-        _peladaSelecionadaId.value = peladaId
-        _mostrarDialogOpcoesPelada.value = true
-    }
-
-    /**
-     * Fecha o diálogo de opções de pelada
-     */
-    fun fecharDialogOpcoesPelada() {
-        _mostrarDialogOpcoesPelada.value = false
-    }
-
-    /**
-     * Carrega o número de jogadores ativos por grupo
-     */
-    private fun carregarJogadoresPorGrupo() {
+    fun onAbrirDialogoSorteioRapido(grupo: GrupoPelada) {
+        _grupoSelecionadoParaSorteioRapido.value = grupo
+        _jogadoresAtivosParaDialogoSorteioRapido.value = _jogadoresPorGrupo.value[grupo.id] ?: 0
+        _erroSorteioRapido.value = null
+        configuracaoRepository.setGrupoId(grupo.id)
         viewModelScope.launch {
             try {
-                // Agora vamos verificar jogadores específicos de cada grupo
-                val jogadoresPorGrupoMap = mutableMapOf<Long, Int>()
-
-                _grupos.value.forEach { grupo ->
-                    val numJogadores = jogadorRepository.countJogadoresAtivosPorGrupo(grupo.id)
-                    jogadoresPorGrupoMap[grupo.id] = numJogadores
+                val perfis = configuracaoRepository.getTodasConfiguracoes().firstOrNull() ?: emptyList()
+                _perfisConfiguracaoSorteio.value = perfis
+                val perfilPadrao = perfis.firstOrNull { p -> p.isPadrao } ?: perfis.firstOrNull()
+                _perfilConfigSelecionadoSorteioRapido.value = perfilPadrao
+                _usarPerfilExistenteSorteioRapido.value = perfilPadrao != null
+                if (perfilPadrao != null) {
+                    _jogadoresPorTimeSorteioRapido.value = perfilPadrao.qtdJogadoresPorTime
+                    _numeroDeTimesSorteioRapido.value = perfilPadrao.qtdTimes
+                } else {
+                    _jogadoresPorTimeSorteioRapido.value = 5
+                    _numeroDeTimesSorteioRapido.value = 2
                 }
-
-                _jogadoresPorGrupo.value = jogadoresPorGrupoMap
+                validarConfiguracaoSorteioRapido()
             } catch (e: Exception) {
-                e.printStackTrace()
-                // Em caso de erro, marca todos os grupos como sem jogadores
-                val jogadoresPorGrupoMap = _grupos.value.associate { grupo ->
-                    grupo.id to 0
-                }
-                _jogadoresPorGrupo.value = jogadoresPorGrupoMap
+                Log.e("GruposVM", "Erro ao carregar perfis de configuração", e)
+                _perfisConfiguracaoSorteio.value = emptyList()
+                _usarPerfilExistenteSorteioRapido.value = false
+                _jogadoresPorTimeSorteioRapido.value = 5
+                _numeroDeTimesSorteioRapido.value = 2
+                validarConfiguracaoSorteioRapido()
             }
+        }
+        _mostrarDialogoConfigSorteioRapido.value = true
+    }
+
+    private fun validarConfiguracaoSorteioRapido() {
+        val jogadoresDisponiveis = _jogadoresAtivosParaDialogoSorteioRapido.value
+        val jogadoresPorTimeConfig: Int
+        val numeroDeTimesConfig: Int
+
+        if (_usarPerfilExistenteSorteioRapido.value) {
+            val perfil = _perfilConfigSelecionadoSorteioRapido.value
+            if (perfil == null && _perfisConfiguracaoSorteio.value.isNotEmpty()) {
+                _erroSorteioRapido.value = "Selecione um perfil de configuração."
+                _podeRealizarSorteioRapido.value = false
+                return
+            } else if (perfil == null && _perfisConfiguracaoSorteio.value.isEmpty()) {
+                 _erroSorteioRapido.value = "Nenhum perfil disponível. Configure manualmente."
+                 _podeRealizarSorteioRapido.value = false
+                 return
+            }
+            jogadoresPorTimeConfig = perfil?.qtdJogadoresPorTime ?: _jogadoresPorTimeSorteioRapido.value
+            numeroDeTimesConfig = perfil?.qtdTimes ?: _numeroDeTimesSorteioRapido.value
+        } else {
+            jogadoresPorTimeConfig = _jogadoresPorTimeSorteioRapido.value
+            numeroDeTimesConfig = _numeroDeTimesSorteioRapido.value
+        }
+
+        if (jogadoresPorTimeConfig <= 0) {
+            _erroSorteioRapido.value = "Jogadores por time deve ser maior que zero."
+            _podeRealizarSorteioRapido.value = false
+            return
+        }
+        if (numeroDeTimesConfig <= 0) {
+            _erroSorteioRapido.value = "Número de times deve ser maior que zero."
+            _podeRealizarSorteioRapido.value = false
+            return
+        }
+
+        val jogadoresNecessarios = jogadoresPorTimeConfig * numeroDeTimesConfig
+        if (jogadoresNecessarios <= 0) {
+             _erroSorteioRapido.value = "Configuração de sorteio inválida."
+             _podeRealizarSorteioRapido.value = false
+             return
+        }
+
+        if (jogadoresDisponiveis < jogadoresNecessarios) {
+            _erroSorteioRapido.value = "São necessários $jogadoresNecessarios jogadores (${numeroDeTimesConfig}x${jogadoresPorTimeConfig}). Grupo: $jogadoresDisponiveis ativos."
+            _podeRealizarSorteioRapido.value = false
+        } else if (jogadoresDisponiveis > jogadoresNecessarios) {
+            _erroSorteioRapido.value = "Grupo: $jogadoresDisponiveis ativos. Serão usados $jogadoresNecessarios (${numeroDeTimesConfig}x${jogadoresPorTimeConfig}). ${jogadoresDisponiveis - jogadoresNecessarios} ficarão de fora."
+            _podeRealizarSorteioRapido.value = true
+        } else {
+            _erroSorteioRapido.value = null
+            _podeRealizarSorteioRapido.value = true
         }
     }
 
-    /**
-     * Atualiza o mapeamento de jogadores quando os grupos são carregados
-     */
-    private fun atualizarJogadoresPorGrupo() {
+    fun onFecharDialogoSorteioRapido() {
+        _mostrarDialogoConfigSorteioRapido.value = false
+    }
+
+    fun onUsarPerfilExistenteSorteioRapidoChanged(usar: Boolean) {
+        _usarPerfilExistenteSorteioRapido.value = usar
+        if (usar) {
+            val perfilPadrao = _perfisConfiguracaoSorteio.value.firstOrNull { p -> p.isPadrao } ?: _perfisConfiguracaoSorteio.value.firstOrNull()
+            _perfilConfigSelecionadoSorteioRapido.value = perfilPadrao
+        } else {
+            _perfilConfigSelecionadoSorteioRapido.value = null
+        }
+        limparErroSorteioRapido()
+        validarConfiguracaoSorteioRapido()
+    }
+
+    fun onPerfilConfigSorteioRapidoSelecionado(perfil: ConfiguracaoSorteio) {
+        _perfilConfigSelecionadoSorteioRapido.value = perfil
+        limparErroSorteioRapido()
+        validarConfiguracaoSorteioRapido()
+    }
+
+    fun onJogadoresPorTimeSorteioRapidoChanged(novoValor: Int) {
+        _jogadoresPorTimeSorteioRapido.value = novoValor
+        limparErroSorteioRapido()
+        validarConfiguracaoSorteioRapido()
+    }
+
+    fun onNumeroDeTimesSorteioRapidoChanged(novoValor: Int) {
+        _numeroDeTimesSorteioRapido.value = novoValor
+        limparErroSorteioRapido()
+        validarConfiguracaoSorteioRapido()
+    }
+
+    fun limparErroSorteioRapido() {
+        _erroSorteioRapido.value = null
+    }
+
+    fun onConfirmarSorteioRapido() {
+        if (!_podeRealizarSorteioRapido.value) {
+            if (_erroSorteioRapido.value.isNullOrBlank()) {
+                 _erroSorteioRapido.value = "Configuração de sorteio inválida ou jogadores insuficientes."
+            }
+            return
+        }
+
+        val grupo = _grupoSelecionadoParaSorteioRapido.value
+        if (grupo == null) {
+            _erroSorteioRapido.value = "Nenhum grupo selecionado."
+            return
+        }
+
         viewModelScope.launch {
             try {
-                val jogadoresPorGrupoMap = mutableMapOf<Long, Int>()
+                val jogadoresAtivos = jogadorRepository.getJogadoresAtivosPorGrupo(grupo.id).firstOrNull() ?: emptyList()
 
-                _grupos.value.forEach { grupo ->
-                    val numJogadores = jogadorRepository.countJogadoresAtivosPorGrupo(grupo.id)
-                    jogadoresPorGrupoMap[grupo.id] = numJogadores
+                if (jogadoresAtivos.isEmpty()) {
+                    _erroSorteioRapido.value = "Não há jogadores ativos no grupo para o sorteio."
+                    _podeRealizarSorteioRapido.value = false
+                    return@launch
                 }
 
-                _jogadoresPorGrupo.value = jogadoresPorGrupoMap
+                val configSorteioUsada: ConfiguracaoSorteio
+                if (_usarPerfilExistenteSorteioRapido.value && _perfilConfigSelecionadoSorteioRapido.value != null) {
+                    configSorteioUsada = _perfilConfigSelecionadoSorteioRapido.value!!
+                } else {
+                    configSorteioUsada = ConfiguracaoSorteio(
+                        id = 0L, 
+                        nome = "Sorteio Rápido Manual",
+                        qtdJogadoresPorTime = _jogadoresPorTimeSorteioRapido.value,
+                        qtdTimes = _numeroDeTimesSorteioRapido.value,
+                        aleatorio = true,
+                        isPadrao = false,
+                        grupoId = grupo.id
+                    )
+                }
+
+                val jogadoresNecessarios = configSorteioUsada.qtdJogadoresPorTime * configSorteioUsada.qtdTimes
+                if (jogadoresAtivos.size < jogadoresNecessarios) {
+                    _erroSorteioRapido.value = "Jogadores insuficientes. Necessários: $jogadoresNecessarios, Disponíveis: ${jogadoresAtivos.size}."
+                    _podeRealizarSorteioRapido.value = false
+                    return@launch
+                }
+
+                // --- INÍCIO DA SIMULAÇÃO --- 
+                Log.d("GruposVM", "SIMULANDO SORTEIO com ${jogadoresAtivos.size} jogadores, ${configSorteioUsada.qtdTimes} times de ${configSorteioUsada.qtdJogadoresPorTime}")
+                val timesSimulados = mutableListOf<Time>()
+                val jogadoresSorteaveis = jogadoresAtivos.shuffled().take(jogadoresNecessarios)
+                var offset = 0
+                for (i in 1..configSorteioUsada.qtdTimes) {
+                    if (offset + configSorteioUsada.qtdJogadoresPorTime <= jogadoresSorteaveis.size) {
+                        val jogadoresDoTime = jogadoresSorteaveis.subList(offset, offset + configSorteioUsada.qtdJogadoresPorTime)
+                        // Alterado nome do time para "Time $i"
+                        timesSimulados.add(Time(id = 0, nome = "Time $i", jogadores = jogadoresDoTime)) 
+                        offset += configSorteioUsada.qtdJogadoresPorTime
+                    } else {
+                        break
+                    }
+                }
+                val resultadoSorteioSimulado = ResultadoSorteio(
+                    times = timesSimulados
+                )
+                // --- FIM DA SIMULAÇÃO ---
+
+                // CHAMADA REAL (MANTENHA COMENTADO ATÉ TER O SORTEIOUSECASE.KT E RESULTADOSORTEIO.KT CORRETOS):
+                // val resultadoSorteio = sorteioUseCase.executarSorteioRapido(jogadoresAtivos, configSorteioUsada)
+                val resultadoSorteio = resultadoSorteioSimulado // Usando a simulação por enquanto
+
+                if (resultadoSorteio != null && resultadoSorteio.times.isNotEmpty()) {
+                    sorteioRepository.salvarResultadoSorteioRapido(resultadoSorteio)
+                    _navegarParaResultadoSorteio.value = true
+                    onFecharDialogoSorteioRapido()
+                } else {
+                    _erroSorteioRapido.value = "Falha ao formar times. Verifique a configuração e jogadores disponíveis."
+                    Log.e("GruposVM", "Sorteio (real ou simulado) não formou times ou falhou.")
+                }
+
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("GruposVM", "Erro ao confirmar sorteio rápido", e)
+                _erroSorteioRapido.value = "Erro inesperado ao sortear: ${e.localizedMessage}"
             }
         }
     }
 
-    /**
-     * Verifica se uma pelada tem jogadores cadastrados
-     */
-    fun peladaTemJogadores(peladaId: Long): Boolean {
-        return (_jogadoresPorGrupo.value[peladaId] ?: 0) > 0
+    fun onNavegacaoParaResultadoSorteioRealizada() {
+        _navegarParaResultadoSorteio.value = null
     }
 }
