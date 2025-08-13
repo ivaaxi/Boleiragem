@@ -129,9 +129,12 @@ class GruposPeladaViewModel @Inject constructor(
                 mapaContagem[grupo.id] = jogadorRepository.countJogadoresAtivosPorGrupo(grupo.id)
             }
             _jogadoresPorGrupo.value = mapaContagem
-            _grupoSelecionadoParaSorteioRapido.value?.let { grupoAtual ->
-                 _jogadoresAtivosParaDialogoSorteioRapido.value = _jogadoresPorGrupo.value[grupoAtual.id] ?: 0
-                validarConfiguracaoSorteioRapido()
+            // Atualizar contagem para o diálogo se já estiver aberto e o grupo for o mesmo
+            _grupoSelecionadoParaSorteioRapido.value?.let { grupoAtualDialogo ->
+                if (_mostrarDialogoConfigSorteioRapido.value) {
+                    _jogadoresAtivosParaDialogoSorteioRapido.value = _jogadoresPorGrupo.value[grupoAtualDialogo.id] ?: 0
+                    validarConfiguracaoSorteioRapido()
+                }
             }
         }
     }
@@ -175,8 +178,8 @@ class GruposPeladaViewModel @Inject constructor(
                 )
                 if (grupoAtual != null) grupoPeladaRepository.atualizarGrupo(grupoSalvar) else grupoPeladaRepository.inserirGrupo(grupoSalvar)
                 fecharDialogoGrupo()
-                kotlinx.coroutines.delay(200)
-                carregarGrupos()
+                kotlinx.coroutines.delay(200) // Pequeno delay para garantir que a UI possa reagir antes de recarregar
+                carregarGrupos() // Isso chamará atualizarJogadoresPorGrupo()
             } catch (e: Exception) { Log.e("GruposVM", "Erro ao salvar grupo", e) }
         }
     }
@@ -206,11 +209,13 @@ class GruposPeladaViewModel @Inject constructor(
 
     fun onAbrirDialogoSorteioRapido(grupo: GrupoPelada) {
         _grupoSelecionadoParaSorteioRapido.value = grupo
-        _jogadoresAtivosParaDialogoSorteioRapido.value = _jogadoresPorGrupo.value[grupo.id] ?: 0
         _erroSorteioRapido.value = null
         configuracaoRepository.setGrupoId(grupo.id)
         viewModelScope.launch {
             try {
+                // Busca a contagem de jogadores mais recente diretamente
+                _jogadoresAtivosParaDialogoSorteioRapido.value = jogadorRepository.countJogadoresAtivosPorGrupo(grupo.id)
+
                 val perfis = configuracaoRepository.getTodasConfiguracoes().firstOrNull() ?: emptyList()
                 _perfisConfiguracaoSorteio.value = perfis
                 val perfilPadrao = perfis.firstOrNull { p -> p.isPadrao } ?: perfis.firstOrNull()
@@ -220,16 +225,18 @@ class GruposPeladaViewModel @Inject constructor(
                     _jogadoresPorTimeSorteioRapido.value = perfilPadrao.qtdJogadoresPorTime
                     _numeroDeTimesSorteioRapido.value = perfilPadrao.qtdTimes
                 } else {
+                    // Mantém valores padrão ou busca de um repositório de configurações default
                     _jogadoresPorTimeSorteioRapido.value = 5
                     _numeroDeTimesSorteioRapido.value = 2
                 }
-                validarConfiguracaoSorteioRapido()
+                validarConfiguracaoSorteioRapido() // Valida com a contagem atualizada
             } catch (e: Exception) {
-                Log.e("GruposVM", "Erro ao carregar perfis de configuração", e)
+                Log.e("GruposVM", "Erro ao carregar dados para sorteio rápido", e)
+                _jogadoresAtivosParaDialogoSorteioRapido.value = 0 // Reseta em caso de erro
                 _perfisConfiguracaoSorteio.value = emptyList()
                 _usarPerfilExistenteSorteioRapido.value = false
-                _jogadoresPorTimeSorteioRapido.value = 5
-                _numeroDeTimesSorteioRapido.value = 2
+                 _jogadoresPorTimeSorteioRapido.value = 5
+                 _numeroDeTimesSorteioRapido.value = 2
                 validarConfiguracaoSorteioRapido()
             }
         }
@@ -343,11 +350,11 @@ class GruposPeladaViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val jogadoresAtivos = jogadorRepository.getJogadoresAtivosPorGrupo(grupo.id).firstOrNull() ?: emptyList()
+                val jogadoresAtivos = jogadorRepository.getJogadoresListAtivosPorGrupo(grupo.id)
 
                 if (jogadoresAtivos.isEmpty()) {
                     _erroSorteioRapido.value = "Não há jogadores ativos no grupo para o sorteio."
-                    _podeRealizarSorteioRapido.value = false
+                    _podeRealizarSorteioRapido.value = false // Garante que não possa prosseguir
                     return@launch
                 }
 
@@ -360,42 +367,30 @@ class GruposPeladaViewModel @Inject constructor(
                         nome = "Sorteio Rápido Manual",
                         qtdJogadoresPorTime = _jogadoresPorTimeSorteioRapido.value,
                         qtdTimes = _numeroDeTimesSorteioRapido.value,
-                        aleatorio = true,
+                        aleatorio = true, // Sorteio rápido é sempre aleatório por enquanto
                         isPadrao = false,
                         grupoId = grupo.id
+                        // criteriosExtras pode ser omitido se aleatorio = true for suficiente
                     )
                 }
 
                 val jogadoresNecessarios = configSorteioUsada.qtdJogadoresPorTime * configSorteioUsada.qtdTimes
                 if (jogadoresAtivos.size < jogadoresNecessarios) {
                     _erroSorteioRapido.value = "Jogadores insuficientes. Necessários: $jogadoresNecessarios, Disponíveis: ${jogadoresAtivos.size}."
-                    _podeRealizarSorteioRapido.value = false
+                    _podeRealizarSorteioRapido.value = false // Garante que não possa prosseguir
                     return@launch
                 }
 
-                // --- INÍCIO DA SIMULAÇÃO --- 
-                Log.d("GruposVM", "SIMULANDO SORTEIO com ${jogadoresAtivos.size} jogadores, ${configSorteioUsada.qtdTimes} times de ${configSorteioUsada.qtdJogadoresPorTime}")
-                val timesSimulados = mutableListOf<Time>()
-                val jogadoresSorteaveis = jogadoresAtivos.shuffled().take(jogadoresNecessarios)
-                var offset = 0
-                for (i in 1..configSorteioUsada.qtdTimes) {
-                    if (offset + configSorteioUsada.qtdJogadoresPorTime <= jogadoresSorteaveis.size) {
-                        val jogadoresDoTime = jogadoresSorteaveis.subList(offset, offset + configSorteioUsada.qtdJogadoresPorTime)
-                        // Alterado nome do time para "Time $i"
-                        timesSimulados.add(Time(id = 0, nome = "Time $i", jogadores = jogadoresDoTime)) 
-                        offset += configSorteioUsada.qtdJogadoresPorTime
-                    } else {
-                        break
-                    }
+                // Lógica de simulação ou chamada real ao SorteioUseCase
+                // A simulação abaixo é um placeholder e pode ser substituída pela chamada real.
+                Log.d("GruposVM", "SORTEANDO com ${jogadoresAtivos.size} jogadores, ${configSorteioUsada.qtdTimes} times de ${configSorteioUsada.qtdJogadoresPorTime}")
+                val jogadoresSorteaveis = if (jogadoresAtivos.size > jogadoresNecessarios) {
+                    jogadoresAtivos.shuffled().take(jogadoresNecessarios)
+                } else {
+                    jogadoresAtivos.shuffled()
                 }
-                val resultadoSorteioSimulado = ResultadoSorteio(
-                    times = timesSimulados
-                )
-                // --- FIM DA SIMULAÇÃO ---
 
-                // CHAMADA REAL (MANTENHA COMENTADO ATÉ TER O SORTEIOUSECASE.KT E RESULTADOSORTEIO.KT CORRETOS):
-                // val resultadoSorteio = sorteioUseCase.executarSorteioRapido(jogadoresAtivos, configSorteioUsada)
-                val resultadoSorteio = resultadoSorteioSimulado // Usando a simulação por enquanto
+                val resultadoSorteio: ResultadoSorteio? = sorteioUseCase.sortearTimesRapido(jogadoresSorteaveis, configSorteioUsada, configSorteioUsada.qtdTimes)
 
                 if (resultadoSorteio != null && resultadoSorteio.times.isNotEmpty()) {
                     sorteioRepository.salvarResultadoSorteioRapido(resultadoSorteio)

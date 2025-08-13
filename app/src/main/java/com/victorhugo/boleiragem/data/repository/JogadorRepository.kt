@@ -22,6 +22,10 @@ class JogadorRepository @Inject constructor(
     fun getJogadoresAtivosPorGrupo(grupoId: Long): Flow<List<Jogador>> =
         jogadorDao.getJogadoresAtivosPorGrupo(grupoId)
 
+    // Novo método adicionado
+    suspend fun getJogadoresListAtivosPorGrupo(grupoId: Long): List<Jogador> =
+        jogadorDao.getJogadoresListAtivosPorGrupo(grupoId)
+
     suspend fun getJogadoresListPorGrupo(grupoId: Long): List<Jogador> =
         jogadorDao.getJogadoresListPorGrupo(grupoId)
 

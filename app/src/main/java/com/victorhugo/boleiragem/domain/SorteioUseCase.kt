@@ -210,7 +210,7 @@ class SorteioUseCase @Inject constructor() {
         return ResultadoSorteio(times)
     }
 
-    // Método auxiliar para aplicar critérios de ordenação
+    // Méthodo auxiliar para aplicar critérios de ordenação
     private fun aplicarCriteriosOrdenacao(
         jogadores: List<Jogador>,
         criteriosExtras: Set<CriterioSorteio>
