@@ -47,43 +47,13 @@ class SorteioUseCase @Inject constructor() {
             jogadoresAtivos.shuffled()
         } else {
             // Se aleatório está desativado, usa os critérios extras
-            when {
-                // Verifica se PONTUACAO está entre os critérios
-                criteriosExtras.contains(CriterioSorteio.PONTUACAO) -> {
-                    // Começa ordenando por pontuação
-                    val jogadoresPorPontuacao = ordenarPorPontuacao(jogadoresAtivos)
-
-                    // Aplica critérios adicionais se necessário
-                    when {
-                        criteriosExtras.contains(CriterioSorteio.POSICAO) && criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
-                            ordenarPorPosicaoEMedia(jogadoresPorPontuacao)
-
-                        criteriosExtras.contains(CriterioSorteio.POSICAO) ->
-                            ordenarPorPosicao(jogadoresPorPontuacao)
-
-                        criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
-                            ordenarPorMedia(jogadoresPorPontuacao)
-
-                        else -> jogadoresPorPontuacao
-                    }
-                }
-
-                // Se não tem PONTUACAO, verifica outros critérios
-                criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
-                    ordenarPorMedia(jogadoresAtivos)
-
-                criteriosExtras.contains(CriterioSorteio.POSICAO) ->
-                    ordenarPorPosicao(jogadoresAtivos)
-
-                // Caso nenhum critério esteja selecionado (não deveria acontecer, mas como fallback)
-                else -> jogadoresAtivos.shuffled()
-            }
+            aplicarCriteriosOrdenacao(jogadoresAtivos, criteriosExtras)
         }
 
         // Nova lógica de distribuição de jogadores
         // Vamos tentar completar o máximo de times possível com o número correto de jogadores
-        val timesCompletos = qtdTimes
-        val jogadoresEmTimesCompletos = timesCompletos * jogadoresPorTime
+        val timesCompletosConfigurados = qtdTimes
+        val jogadoresEmTimesCompletos = timesCompletosConfigurados * jogadoresPorTime
 
         // Se temos jogadores suficientes para todos os times
         if (jogadoresOrdenados.size >= jogadoresEmTimesCompletos) {
@@ -93,19 +63,19 @@ class SorteioUseCase @Inject constructor() {
             val jogadoresReserva = jogadoresOrdenados.drop(jogadoresEmTimesCompletos)
 
             // Distribuir jogadores nos times completos
-            val timesCompletos = distribuirJogadoresEmTimes(jogadoresParaTimesCompletos, jogadoresPorTime, timesCompletos)
+            val timesPrincipais = distribuirJogadoresEmTimes(jogadoresParaTimesCompletos, jogadoresPorTime, timesCompletosConfigurados)
 
             // Se tivermos jogadores na reserva, criamos um time reserva
             val todosOsTimes = if (jogadoresReserva.isNotEmpty()) {
                 val timeReserva = Time(
-                    id = timesCompletos.size, // ID do time reserva é o próximo após os times completos
+                    id = timesPrincipais.size, // ID do time reserva é o próximo após os times completos
                     nome = "Time Reserva", // Nome fixo: "Time Reserva"
                     jogadores = jogadoresReserva,
                     ehTimeReserva = true // Marca como time reserva
                 )
-                timesCompletos + timeReserva
+                timesPrincipais + timeReserva
             } else {
-                timesCompletos
+                timesPrincipais
             }
 
             return ResultadoSorteio(todosOsTimes)
@@ -123,17 +93,17 @@ class SorteioUseCase @Inject constructor() {
                 val jogadoresReserva = jogadoresOrdenados.drop(timesCompletosPodemSerFormados * jogadoresPorTime)
 
                 // Distribuir jogadores nos times completos
-                val timesCompletos = distribuirJogadoresEmTimes(jogadoresParaTimesCompletos, jogadoresPorTime, timesCompletosPodemSerFormados)
+                val timesPrincipais = distribuirJogadoresEmTimes(jogadoresParaTimesCompletos, jogadoresPorTime, timesCompletosPodemSerFormados)
 
                 // Criamos o time reserva com os jogadores restantes
                 val timeReserva = Time(
-                    id = timesCompletosPodemSerFormados,
+                    id = timesPrincipais.size,
                     nome = "Time Reserva",
                     jogadores = jogadoresReserva,
                     ehTimeReserva = true // Marca como time reserva
                 )
 
-                return ResultadoSorteio(timesCompletos + timeReserva)
+                return ResultadoSorteio(timesPrincipais + timeReserva)
             } else {
                 // Não conseguimos formar nem um time completo, todos os jogadores vão para o time reserva
                 val timeReserva = Time(
@@ -148,69 +118,54 @@ class SorteioUseCase @Inject constructor() {
         }
     }
 
+    // Método sortearTimesRapido modificado para incluir time reserva
     fun sortearTimesRapido(
         jogadores: List<Jogador>,
-        configuracao: ConfiguracaoSorteio,
-        numeroTimes: Int
+        configuracao: ConfiguracaoSorteio, // Usaremos qtdJogadoresPorTime daqui
+        numeroTimesPrincipais: Int // Este é o número de times principais desejado
     ): ResultadoSorteio {
         if (jogadores.isEmpty()) {
             return ResultadoSorteio(emptyList())
         }
 
-        // Determina a quantidade de jogadores por time baseado no total de jogadores e número de times
-        val jogadoresPorTime = jogadores.size / numeroTimes
-        val jogadoresSobrando = jogadores.size % numeroTimes
-
-        // Ordenar jogadores conforme critérios
+        // Ordenar jogadores conforme critérios da configuração (aleatorio ou criteriosExtras)
         val jogadoresOrdenados = if (configuracao.aleatorio) {
-            // Se aleatório está ativado, ignora outros critérios
             jogadores.shuffled()
         } else {
-            // Aplica critérios de ordenação
             aplicarCriteriosOrdenacao(jogadores, configuracao.criteriosExtras)
         }
 
-        // Cria os times vazios
-        val times = List(numeroTimes) { index ->
-            Time(
-                id = index,
-                nome = "Time ${index + 1}",
-                jogadores = ArrayList()
+        val jogadoresPorTimeDefinido = configuracao.qtdJogadoresPorTime
+        val totalJogadoresParaTimesPrincipais = numeroTimesPrincipais * jogadoresPorTimeDefinido
+
+        // ViewModel já deve garantir que jogadores.size >= totalJogadoresParaTimesPrincipais
+        // Se, por algum motivo, não for o caso, pode-se adicionar um tratamento de erro ou fallback aqui,
+        // mas idealmente a camada de ViewModel (GruposPeladaViewModel) já validou isso.
+
+        val jogadoresParaDistribuirNosTimes = jogadoresOrdenados.take(totalJogadoresParaTimesPrincipais)
+        val jogadoresReserva = jogadoresOrdenados.drop(totalJogadoresParaTimesPrincipais)
+
+        val timesPrincipais = distribuirJogadoresEmTimes(
+            jogadoresParaDistribuirNosTimes,
+            jogadoresPorTimeDefinido,
+            numeroTimesPrincipais
+        )
+
+        val todosOsTimes = if (jogadoresReserva.isNotEmpty()) {
+            val timeReserva = Time(
+                id = timesPrincipais.size, // ID sequencial após os times principais
+                nome = "Time Reserva",
+                jogadores = jogadoresReserva,
+                ehTimeReserva = true
             )
-        }.toMutableList()
-
-        // Distribui jogadores em times usando método de serpentina
-        var direcaoCrescente = true
-        var timeIndex = 0
-
-        jogadoresOrdenados.forEach { jogador ->
-            // Obter lista atual de jogadores
-            val jogadoresAtuais = ArrayList(times[timeIndex].jogadores)
-            // Adicionar o novo jogador
-            jogadoresAtuais.add(jogador)
-            // Atualizar o time com a nova lista de jogadores
-            times[timeIndex] = times[timeIndex].copy(jogadores = jogadoresAtuais)
-
-            // Determina o próximo time para distribuir (método serpentina)
-            if (direcaoCrescente) {
-                timeIndex++
-                if (timeIndex >= numeroTimes) {
-                    timeIndex = numeroTimes - 2
-                    direcaoCrescente = false
-                }
-            } else {
-                timeIndex--
-                if (timeIndex < 0) {
-                    timeIndex = 1
-                    direcaoCrescente = true
-                }
-            }
+            timesPrincipais + timeReserva
+        } else {
+            timesPrincipais
         }
 
-        return ResultadoSorteio(times)
+        return ResultadoSorteio(todosOsTimes)
     }
 
-    // Méthodo auxiliar para aplicar critérios de ordenação
     private fun aplicarCriteriosOrdenacao(
         jogadores: List<Jogador>,
         criteriosExtras: Set<CriterioSorteio>
@@ -218,10 +173,8 @@ class SorteioUseCase @Inject constructor() {
         return when {
             criteriosExtras.contains(CriterioSorteio.PONTUACAO) -> {
                 val jogadoresPorPontuacao = ordenarPorPontuacao(jogadores)
-
                 when {
-                    criteriosExtras.contains(CriterioSorteio.POSICAO) &&
-                    criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
+                    criteriosExtras.contains(CriterioSorteio.POSICAO) && criteriosExtras.contains(CriterioSorteio.MEDIA_NOTAS) ->
                         ordenarPorPosicaoEMedia(jogadoresPorPontuacao)
                     criteriosExtras.contains(CriterioSorteio.POSICAO) ->
                         ordenarPorPosicao(jogadoresPorPontuacao)
@@ -234,18 +187,15 @@ class SorteioUseCase @Inject constructor() {
                 ordenarPorMedia(jogadores)
             criteriosExtras.contains(CriterioSorteio.POSICAO) ->
                 ordenarPorPosicao(jogadores)
-            // Caso nenhum critério esteja selecionado (não deveria acontecer, mas como fallback)
-            else -> jogadores.shuffled()
+            else -> jogadores.shuffled() // Fallback para aleatório se nenhum critério especificado
         }
     }
 
     private fun ordenarPorPontuacao(jogadores: List<Jogador>): List<Jogador> {
-        // Ordena jogadores pela pontuação total (do maior para o menor)
         return jogadores.sortedByDescending { it.pontuacaoTotal }
     }
 
     private fun ordenarPorPosicaoEMedia(jogadores: List<Jogador>): List<Jogador> {
-        // Agrupa por posição e ordena cada grupo por média de nota
         return jogadores
             .groupBy { it.posicaoPrincipal }
             .flatMap { (_, jogadoresDaPosicao) ->
@@ -254,12 +204,10 @@ class SorteioUseCase @Inject constructor() {
     }
 
     private fun ordenarPorPosicao(jogadores: List<Jogador>): List<Jogador> {
-        // Primeiro ordena por posição e depois mantém a ordem original dentro de cada posição
         return jogadores.sortedBy { it.posicaoPrincipal.ordinal }
     }
 
     private fun ordenarPorMedia(jogadores: List<Jogador>): List<Jogador> {
-        // Ordena por média das notas (da maior para a menor)
         return jogadores.sortedByDescending { it.notaPosicaoPrincipal }
     }
 
@@ -268,45 +216,46 @@ class SorteioUseCase @Inject constructor() {
         jogadoresPorTime: Int,
         qtdTimes: Int
     ): List<Time> {
-        // Inicializa a lista de times com listas mutáveis de jogadores
-        var times = List(qtdTimes) { index ->
+        if (qtdTimes <= 0 || jogadoresPorTime <= 0) return emptyList()
+
+        val times = MutableList(qtdTimes) { index ->
             Time(
-                id = index, // Usando Int em vez de Long
+                id = index,
                 nome = "Time ${index + 1}",
-                jogadores = ArrayList() // Usando ArrayList que é mutável e suporta o método add
+                jogadores = ArrayList()
             )
         }
 
-        // Distribui jogadores em times usando método de serpentina
         var direcaoCrescente = true
         var timeIndex = 0
+        var jogadoresAlocados = 0
 
         jogadoresOrdenados.forEach { jogador ->
-            // Obter lista atual de jogadores
-            val jogadoresAtuais = ArrayList(times[timeIndex].jogadores)
-            // Adicionar o novo jogador
-            jogadoresAtuais.add(jogador)
-            // Criar um novo Time com a lista atualizada
-            times = times.toMutableList().apply {
-                set(timeIndex, times[timeIndex].copy(jogadores = jogadoresAtuais))
+            if (jogadoresAlocados >= jogadoresOrdenados.size) return@forEach // Evita IndexOutOfBounds se jogadoresOrdenados for menor que o esperado
+
+            (times[timeIndex].jogadores as ArrayList).add(jogador)
+            jogadoresAlocados++
+
+            if (jogadoresAlocados % jogadoresPorTime == 0 && jogadoresAlocados >= jogadoresPorTime * (timeIndex +1) && qtdTimes > 1) { // Lógica para avançar time após ele estar "cheio" conceitualmente
+                 // A distribuição serpentina continua baseada na iteração total
             }
 
-            // Atualiza o índice do time para o próximo jogador
-            if (direcaoCrescente) {
-                timeIndex++
-                if (timeIndex >= qtdTimes) {
-                    timeIndex = qtdTimes - 1
-                    direcaoCrescente = false
-                }
-            } else {
-                timeIndex--
-                if (timeIndex < 0) {
-                    timeIndex = 0
-                    direcaoCrescente = true
+            if (qtdTimes > 1) { // Apenas muda de time se houver mais de um time
+                if (direcaoCrescente) {
+                    timeIndex++
+                    if (timeIndex >= qtdTimes) {
+                        timeIndex = qtdTimes - 2 // Volta para o penúltimo para descer
+                        direcaoCrescente = false
+                    }
+                } else {
+                    timeIndex--
+                    if (timeIndex < 0) {
+                        timeIndex = 1 // Volta para o segundo para subir
+                        direcaoCrescente = true
+                    }
                 }
             }
         }
-
         return times
     }
 }

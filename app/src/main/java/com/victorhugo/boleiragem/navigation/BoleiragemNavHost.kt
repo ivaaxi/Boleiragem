@@ -10,8 +10,30 @@ import androidx.navigation.navArgument
 import com.victorhugo.boleiragem.ui.screens.cadastro.DetalheJogadorScreen
 import com.victorhugo.boleiragem.ui.screens.configuracao.GerenciadorPerfisScreen
 import com.victorhugo.boleiragem.ui.screens.estatisticas.EstatisticasScreen
+import com.victorhugo.boleiragem.ui.screens.login.LoginScreen // Import adicionado
 import com.victorhugo.boleiragem.ui.screens.sorteio.ResultadoSorteioScreen
 import com.victorhugo.boleiragem.ui.screens.splash.SplashScreen
+
+// Definições de NavDestinations
+sealed class NavDestinations(val route: String) {
+    object Splash : NavDestinations("splash_screen")
+    object Login : NavDestinations("login_screen") // Nova rota de Login
+    object CadastroJogadores : NavDestinations("cadastro_jogadores_screen") // Rota principal (com ViewPager)
+    object ConfiguracaoTimes : NavDestinations("configuracao_times_screen")
+    object SorteioTimes : NavDestinations("sorteio_times_screen")
+    object TimesAtuais : NavDestinations("times_atuais_screen")
+    object Historico : NavDestinations("historico_screen")
+    object DetalheJogador : NavDestinations("detalhe_jogador_screen/{jogadorId}") {
+        fun createRoute(jogadorId: Long) = "detalhe_jogador_screen/$jogadorId"
+    }
+    object ResultadoSorteio : NavDestinations("resultado_sorteio_screen/{isSorteioRapido}") {
+        fun createRoute(isSorteioRapido: Boolean) = "resultado_sorteio_screen/$isSorteioRapido"
+    }
+    object GerenciadorPerfis : NavDestinations("gerenciador_perfis_screen/{grupoId}") {
+        fun createRoute(grupoId: Long) = "gerenciador_perfis_screen/$grupoId"
+    }
+    object Estatisticas : NavDestinations("estatisticas_screen")
+}
 
 @Composable
 fun BoleiragemNavHost(
@@ -21,88 +43,78 @@ fun BoleiragemNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = NavDestinations.Splash.route,
+        startDestination = NavDestinations.Splash.route, // Splash ainda é o início
         modifier = modifier
     ) {
-        // SplashScreen - Temporário até a navegação para o Home
-        composable(
-            route = NavDestinations.Splash.route
-        ) {
+        composable(NavDestinations.Splash.route) {
             SplashScreen(onNavigateToHome = {
-                navController.navigate(NavDestinations.CadastroJogadores.route) {
+                navController.navigate(NavDestinations.Login.route) { // Navega para Login
                     popUpTo(NavDestinations.Splash.route) { inclusive = true }
+                    launchSingleTop = true // Evita múltiplas instâncias da tela de login na pilha
                 }
             })
         }
 
-        // Telas principais com navegação por abas - renderizadas apenas quando showMainScreens é true
-        // Estas telas agora são gerenciadas pelo ViewPager na MainActivity
-        if (showMainScreens) {
-            composable(route = NavDestinations.CadastroJogadores.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
-            composable(route = NavDestinations.ConfiguracaoTimes.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
-            composable(route = NavDestinations.SorteioTimes.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
-            composable(route = NavDestinations.TimesAtuais.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
-            composable(route = NavDestinations.Historico.route) { /* Implementação vazia, gerenciada pelo ViewPager */ }
+        composable(NavDestinations.Login.route) {
+            LoginScreen(
+                onLoginClick = {
+                    // TODO: Implementar lógica de login real se necessário
+                    // Por enquanto, navega para a tela principal
+                    navController.navigate(NavDestinations.CadastroJogadores.route) {
+                        popUpTo(NavDestinations.Login.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+                onEntrarSemContaClick = {
+                    navController.navigate(NavDestinations.CadastroJogadores.route) {
+                        popUpTo(NavDestinations.Login.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
 
-        // Tela de detalhes do jogador (sem bottom navigation)
+        // Telas principais com navegação por abas - gerenciadas pelo ViewPager na MainActivity
+        if (showMainScreens) {
+            composable(route = NavDestinations.CadastroJogadores.route) { /* Conteúdo gerenciado pelo ViewPager */ }
+            composable(route = NavDestinations.ConfiguracaoTimes.route) { /* Conteúdo gerenciado pelo ViewPager */ }
+            composable(route = NavDestinations.SorteioTimes.route) { /* Conteúdo gerenciado pelo ViewPager */ }
+            composable(route = NavDestinations.TimesAtuais.route) { /* Conteúdo gerenciado pelo ViewPager */ }
+            composable(route = NavDestinations.Historico.route) { /* Conteúdo gerenciado pelo ViewPager */ }
+        }
+
         composable(
             route = NavDestinations.DetalheJogador.route,
-            arguments = listOf(
-                navArgument("jogadorId") { type = NavType.LongType }
-            )
+            arguments = listOf(navArgument("jogadorId") { type = NavType.LongType })
         ) {
             val jogadorId = it.arguments?.getLong("jogadorId") ?: -1L
             DetalheJogadorScreen(
                 jogadorId = jogadorId,
-                onBackClick = {
-                    navController.navigateUp()
-                }
+                onBackClick = { navController.navigateUp() }
             )
         }
 
-        // Tela de resultado do sorteio (sem bottom navigation)
         composable(
-            route = NavDestinations.ResultadoSorteio.route, // Rota já inclui /{isSorteioRapido}
-            arguments = listOf(
-                navArgument("isSorteioRapido") {
-                    type = NavType.BoolType
-                    defaultValue = false // Sorteios normais são o padrão
-                }
-            )
+            route = NavDestinations.ResultadoSorteio.route,
+            arguments = listOf(navArgument("isSorteioRapido") { type = NavType.BoolType; defaultValue = false })
         ) {
-            // O ResultadoSorteioViewModel pegará 'isSorteioRapido' do SavedStateHandle
             ResultadoSorteioScreen(
-                onBackClick = {
-                    navController.navigateUp()
-                }
-                // onConfirmarClick e onCancelarClick usam os padrões da tela,
-                // que chamam onBackClick. O ViewModel lida com a lógica de confirmação/cancelamento.
+                onBackClick = { navController.navigateUp() }
             )
         }
 
-        // Tela de gerenciamento de perfis de configuração (sem bottom navigation)
         composable(
             route = NavDestinations.GerenciadorPerfis.route,
-            arguments = listOf(
-                navArgument("grupoId") { type = NavType.LongType }
-            )
+            arguments = listOf(navArgument("grupoId") { type = NavType.LongType })
         ) {
             GerenciadorPerfisScreen(
-                onNavigateBack = {
-                    navController.navigateUp()
-                }
+                onNavigateBack = { navController.navigateUp() }
             )
         }
 
-        // Tela de estatísticas (sem bottom navigation)
-        composable(
-            route = NavDestinations.Estatisticas.route
-        ) {
+        composable(route = NavDestinations.Estatisticas.route) {
             EstatisticasScreen(
-                onNavigateBack = {
-                    navController.navigateUp()
-                }
+                onNavigateBack = { navController.navigateUp() }
             )
         }
     }

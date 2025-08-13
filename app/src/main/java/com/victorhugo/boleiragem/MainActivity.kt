@@ -1,4 +1,3 @@
-
 package com.victorhugo.boleiragem
 
 import android.Manifest
@@ -9,11 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -147,7 +142,6 @@ fun BoleiragemApp() {
             )
         }
         showGruposScreen -> {
-            // val navController = rememberNavController() // NavController local não é mais necessário aqui para este propósito
             GruposPeladaScreen(
                 onGrupoSelecionado = { grupoId, grupoNome ->
                     grupoSelecionadoId = grupoId
@@ -160,9 +154,13 @@ fun BoleiragemApp() {
                         showGruposScreen = false
                         showResultadoSorteioRapido = true
                     }
-                    // Se precisar lidar com !isSorteioRapidoValue, adicione lógica aqui
+                },
+                onSairClick = { // Implementação do onSairClick
+                    showGruposScreen = false
+                    showLoginScreen = true
+                    showResultadoSorteioRapido = false // Garante que outras telas sejam resetadas
+                    // grupoSelecionadoId e grupoSelecionadoNome não precisam ser resetados aqui
                 }
-                // navController = navController // Removido
             )
         }
         showResultadoSorteioRapido -> {
@@ -172,41 +170,32 @@ fun BoleiragemApp() {
                 startDestination = "placeholder_resultado_sorteio" // Rota inicial temporária
             ) {
                 composable("placeholder_resultado_sorteio") {
-                    // Pode ser um Box vazio ou um indicador de carregamento,
-                    // já que vamos navegar imediatamente.
                     Box(modifier = Modifier.fillMaxSize())
                 }
                 composable(
-                    route = NavDestinations.ResultadoSorteio.route, // Rota real: "resultado_sorteio/{isSorteioRapido}"
+                    route = NavDestinations.ResultadoSorteio.route, 
                     arguments = listOf(navArgument("isSorteioRapido") { type = NavType.BoolType })
                 ) {
-                    // ResultadoSorteioViewModel pegará 'isSorteioRapido' do SavedStateHandle
                     ResultadoSorteioScreen(
                         onBackClick = {
                             showResultadoSorteioRapido = false
-                            showGruposScreen = true // Voltar para a tela de grupos
+                            showGruposScreen = true 
                         }
-                        // onConfirmarClick e onCancelarClick usam os padrões da tela,
-                        // que chamam onBackClick. Para sorteio rápido, isso significa voltar para Grupos.
                     )
                 }
             }
-            // Navega para a tela de resultado após o NavHost ser composto
             LaunchedEffect(Unit) {
                 tempNavController.navigate(NavDestinations.ResultadoSorteio.createRoute(isSorteioRapido = true)) {
-                    popUpTo("placeholder_resultado_sorteio") { inclusive = true } // Remove o placeholder do backstack
+                    popUpTo("placeholder_resultado_sorteio") { inclusive = true } 
                 }
             }
         }
         else -> {
-            // Mostrar o conteúdo principal do aplicativo (MainScreen)
-            // Isso acontece se nenhuma das flags acima for true (ex: grupo foi selecionado)
             MainScreen(
                 grupoId = grupoSelecionadoId,
                 grupoNome = grupoSelecionadoNome,
                 onVoltarParaGerenciamento = {
                     showGruposScreen = true
-                    // Outras flags como showResultadoSorteioRapido devem ser false aqui
                     showResultadoSorteioRapido = false
                 }
             )
@@ -221,23 +210,19 @@ fun MainScreen(
     grupoNome: String = "",
     onVoltarParaGerenciamento: () -> Unit = {}
 ) {
-    val navController = rememberNavController() // NavController para o Pager e navegação interna do MainScreen
+    val navController = rememberNavController() 
     val scope = rememberCoroutineScope()
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val pagerState = rememberPagerState(
         initialPage = selectedTabIndex,
-        pageCount = { 6 }
+        pageCount = { 6 } // Ajuste pageCount conforme o número de abas
     )
 
     LaunchedEffect(pagerState.currentPage) {
         selectedTabIndex = pagerState.currentPage
     }
 
-    val navigateToTab = { tabIndex: Int ->
-        scope.launch {
-            pagerState.animateScrollToPage(tabIndex)
-        }
-    }
+    // val navigateToTab = { tabIndex: Int -> ... } // Não é mais usado diretamente aqui
 
     var isSecondaryScreen by remember { mutableStateOf(false) }
     var secondaryScreenContent by remember { mutableStateOf<@Composable () -> Unit>({}) }
@@ -296,80 +281,10 @@ fun MainScreen(
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-            ) { page ->
-                when (page) {
-                    0 -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CadastroJogadoresScreen(
-                                grupoId = grupoId,
-                                onNavigateToDetalheJogador = { jogadorId ->
-                                    isSecondaryScreen = true
-                                    secondaryScreenContent = {
-                                        DetalheJogadorScreen(
-                                            jogadorId = jogadorId,
-                                            onBackClick = {
-                                                isSecondaryScreen = false
-                                            }
-                                        )
-                                    }
-                                }
-                            )
-                        }
-                    }
-                    1 -> ConfiguracaoTimesScreen(
-                        grupoId = grupoId,
-                        onNavigateToConfiguracaoPontuacao = {
-                            isSecondaryScreen = true
-                            secondaryScreenContent = {
-                                ConfiguracaoPontuacaoScreen(
-                                    onBackClick = {
-                                        isSecondaryScreen = false
-                                    }
-                                )
-                            }
-                        },
-                        onNavigateToGerenciadorPerfis = {
-                            isSecondaryScreen = true
-                            secondaryScreenContent = {
-                                GerenciadorPerfisScreen(
-                                    grupoId = grupoId,
-                                    onNavigateBack = {
-                                        isSecondaryScreen = false
-                                    }
-                                )
-                            }
-                        }
-                    )
-                    2 -> SorteioTimesScreen( // Sorteio normal (não rápido)
-                        grupoId = grupoId,
-                        onSorteioRealizado = {
-                            isSecondaryScreen = true
-                            secondaryScreenContent = {
-                                // ViewModel é pego via hiltViewModel() e SavedStateHandle (isSorteioRapido = false por padrão)
-                                ResultadoSorteioScreen(
-                                    onBackClick = {
-                                        isSecondaryScreen = false
-                                    },
-                                    onConfirmarClick = {
-                                        isSecondaryScreen = false
-                                        navigateToTab(3) // Navega para a aba Times Atuais
-                                    },
-                                    onCancelarClick = {
-                                        isSecondaryScreen = false // Volta para SorteioTimesScreen
-                                    }
-                                )
-                            }
-                        },
-                        onNavigateToHistorico = { /* Não usado para navegação automática */ }
-                    )
-                    3 -> TimesAtuaisScreen()
-                    4 -> HistoricoScreen()
-                    5 -> EstatisticasScreen()
-                }
+                    .padding(innerPadding) // Aplicar innerPadding aqui
+            ) {
+                // O conteúdo das suas abas/páginas vai aqui,
+                // por exemplo, usando um when(selectedTabIndex) ou similar
             }
         }
     }

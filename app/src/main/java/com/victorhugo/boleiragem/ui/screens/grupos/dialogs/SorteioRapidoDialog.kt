@@ -26,7 +26,8 @@ fun SorteioRapidoDialog(
     jogadoresPorTimeManual: Int,
     numeroDeTimesManual: Int,
     erroAtual: String?,
-    podeRealizarSorteio: Boolean, 
+    podeRealizarSorteio: Boolean,
+    isSorteioListaColada: Boolean = false, // Novo parâmetro
     onDismissRequest: () -> Unit,
     onUsarPerfilChanged: (Boolean) -> Unit,
     onPerfilSelecionadoChanged: (ConfiguracaoSorteio) -> Unit,
@@ -56,32 +57,36 @@ fun SorteioRapidoDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Sorteio Rápido para: ${grupoPelada.nome}",
+                    text = if (isSorteioListaColada) "Sorteio da Lista Colada" else "Sorteio Rápido para: ${grupoPelada.nome}",
                     style = MaterialTheme.typography.titleLarge
                 )
-                HorizontalDivider() // Corrigido
+                HorizontalDivider()
 
                 Text(
                     text = "Fonte dos Jogadores:",
                     style = MaterialTheme.typography.titleMedium
                 )
                 OutlinedTextField(
-                    value = "Grupo: ${grupoPelada.nome} ($jogadoresAtivosNoGrupo jogadores)",
+                    value = if (isSorteioListaColada) "Lista Colada ($jogadoresAtivosNoGrupo jogadores)" else "Grupo: ${grupoPelada.nome} ($jogadoresAtivosNoGrupo jogadores)",
                     onValueChange = {},
-                    label = { Text("Grupo Selecionado") },
+                    label = { Text(if (isSorteioListaColada) "Lista Colada" else "Grupo Selecionado") },
                     modifier = Modifier.fillMaxWidth(),
                     readOnly = true,
                     enabled = false
                 )
-                OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
-                    label = { Text("Colar Lista de Jogadores (Em breve)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = false
-                )
+                // O campo "Colar Lista de Jogadores (Em breve)" pode ser removido ou ajustado futuramente
+                // Por ora, não interfere na lógica atual.
+                if (!isSorteioListaColada) {
+                    OutlinedTextField(
+                        value = "",
+                        onValueChange = {},
+                        label = { Text("Colar Lista de Jogadores (Use o FAB)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = false
+                    )
+                }
 
-                HorizontalDivider() // Corrigido
+                HorizontalDivider()
 
                 Text(
                     text = "Configuração do Sorteio:",
@@ -95,10 +100,11 @@ fun SorteioRapidoDialog(
                     Checkbox(
                         checked = usarPerfilExistente,
                         onCheckedChange = {
-                            onClearError() 
+                            onClearError()
                             onUsarPerfilChanged(it)
                         },
-                        enabled = perfisConfiguracao.isNotEmpty()
+                        // Desabilita se for lista colada ou se não houver perfis
+                        enabled = perfisConfiguracao.isNotEmpty() && !isSorteioListaColada
                     )
                     Text(
                         text = "Usar perfil existente?",
@@ -106,12 +112,12 @@ fun SorteioRapidoDialog(
                     )
                 }
 
-                if (usarPerfilExistente) {
+                if (usarPerfilExistente && !isSorteioListaColada) { // Só mostra perfis se não for lista colada
                     if (perfisConfiguracao.isNotEmpty()) {
                         ExposedDropdownMenuBox(
                             expanded = expandirDropdownPerfis,
                             onExpandedChange = { expandirDropdownPerfis = !expandirDropdownPerfis },
-                            modifier = Modifier.fillMaxWidth() // Adicionado para ocupar a largura
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedTextField(
                                 value = perfilSelecionado?.nome ?: "Nenhum perfil disponível",
@@ -119,8 +125,8 @@ fun SorteioRapidoDialog(
                                 readOnly = true,
                                 label = { Text("Perfil de Configuração") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandirDropdownPerfis) },
-                                modifier = Modifier.fillMaxWidth(), // Removido .menuAnchor()
-                                isError = erroAtual != null && perfilSelecionado == null && perfisConfiguracao.isNotEmpty() 
+                                modifier = Modifier.fillMaxWidth(),
+                                isError = erroAtual != null && perfilSelecionado == null && perfisConfiguracao.isNotEmpty()
                             )
                             ExposedDropdownMenu(
                                 expanded = expandirDropdownPerfis,
@@ -130,7 +136,7 @@ fun SorteioRapidoDialog(
                                     DropdownMenuItem(
                                         text = { Text(perfil.nome) },
                                         onClick = {
-                                            onClearError() 
+                                            onClearError()
                                             onPerfilSelecionadoChanged(perfil)
                                             expandirDropdownPerfis = false
                                         }
@@ -139,13 +145,13 @@ fun SorteioRapidoDialog(
                             }
                         }
                     } else {
-                        Text("Nenhum perfil de configuração salvo para este grupo. Desmarque a opção acima para configurar manualmente.")
+                        Text("Nenhum perfil de configuração salvo para este grupo. Configure manualmente.")
                     }
-                } else {
+                } else { // Configuração Manual (para lista colada ou quando não usa perfil)
                     OutlinedTextField(
-                        value = if (jogadoresPorTimeManual == 0 && numeroDeTimesManual == 0 && perfilSelecionado == null) "" else jogadoresPorTimeManual.toString().takeIf { it != "0" } ?: "",
+                        value = if (jogadoresPorTimeManual == 0 && !usarPerfilExistente) "" else jogadoresPorTimeManual.toString().takeIf { it != "0" } ?: "",
                         onValueChange = {
-                            onClearError() 
+                            onClearError()
                             onJogadoresPorTimeManualChanged(it)
                         },
                         label = { Text("Nº de Jogadores por Time") },
@@ -155,9 +161,9 @@ fun SorteioRapidoDialog(
                         isError = erroAtual?.contains("jogadores por time", ignoreCase = true) == true || erroAtual?.contains("deve ser maior que zero", ignoreCase = true) == true
                     )
                     OutlinedTextField(
-                        value = if (numeroDeTimesManual == 0 && jogadoresPorTimeManual == 0 && perfilSelecionado == null) "" else numeroDeTimesManual.toString().takeIf { it != "0" } ?: "",
+                        value = if (numeroDeTimesManual == 0 && !usarPerfilExistente) "" else numeroDeTimesManual.toString().takeIf { it != "0" } ?: "",
                         onValueChange = {
-                            onClearError() 
+                            onClearError()
                             onNumeroDeTimesManualChanged(it)
                         },
                         label = { Text("Nº de Times") },
@@ -191,7 +197,7 @@ fun SorteioRapidoDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = onConfirmSorteio,
-                        enabled = podeRealizarSorteio 
+                        enabled = podeRealizarSorteio
                     ) {
                         Text("Sortear")
                     }

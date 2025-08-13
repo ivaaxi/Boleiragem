@@ -1,5 +1,7 @@
 package com.victorhugo.boleiragem.ui.screens.login
 
+// import com.victorhugo.boleiragem.BuildConfig // Vamos tentar sem este import direto por enquanto
+import com.victorhugo.boleiragem.R
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,23 +20,34 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.victorhugo.boleiragem.R
 
 @Composable
 fun LoginScreen(
     onLoginClick: () -> Unit = {},
     onEntrarSemContaClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val versionName = remember {
+        try {
+            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            packageInfo.versionName
+        } catch (e: Exception) {
+            "N/A" // Retorno em caso de erro
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -118,13 +131,23 @@ fun LoginScreen(
         }
         
         // Rodapé
-        Text(
-            text = "© 2025 Boleiragem - Todos os direitos reservados",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp)
-        )
+                .padding(bottom = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Versão: $versionName", // Usando a versão obtida pelo context
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.height(4.dp)) // Pequeno espaço entre a versão e o copyright
+            Text(
+                text = "© 2025 Boleiragem - Todos os direitos reservados",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+            )
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.victorhugo.boleiragem.ui.screens.grupos
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.GridView
@@ -46,6 +48,7 @@ import com.victorhugo.boleiragem.data.model.GrupoPelada
 import com.victorhugo.boleiragem.data.model.TipoRecorrencia
 import com.victorhugo.boleiragem.ui.screens.compartilhar.CompartilharPeladaScreen
 import com.victorhugo.boleiragem.ui.screens.grupos.dialogs.SorteioRapidoDialog
+import com.victorhugo.boleiragem.ui.screens.sorteio.ColaListaJogadoresDialog
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -54,15 +57,19 @@ import java.util.Locale
 fun GruposPeladaScreen(
     viewModel: GruposPeladaViewModel = hiltViewModel(),
     onGrupoSelecionado: (Long, String) -> Unit = { _, _ -> },
-    onNavigateToSorteioResultado: (isSorteioRapido: Boolean) -> Unit
+    onNavigateToSorteioResultado: (isSorteioRapido: Boolean) -> Unit,
+    onSairClick: () -> Unit
 ) {
     val grupos by viewModel.grupos.collectAsState()
     val tipoVisualizacao by viewModel.tipoVisualizacao.collectAsState()
     val carregando by viewModel.carregando.collectAsState()
     val mostrarDialogoGrupo by viewModel.mostrarDialogoGrupo.collectAsState()
     val grupoEmEdicao by viewModel.grupoEmEdicao.collectAsState()
+    val context = LocalContext.current
 
-    var mostrarDialogoSelecionarGrupoParaSorteioRapido by remember { mutableStateOf(false) } // Novo estado
+    var mostrarDialogoSelecionarGrupoParaSorteioRapido by remember { mutableStateOf(false) }
+    var mostrarDialogoColaLista by remember { mutableStateOf(false) }
+    var mostrarDialogoOpcoesSorteio by remember { mutableStateOf(false) } // Novo estado
 
     val navegarParaDetalheGrupo: (GrupoPelada) -> Unit = {
         grupo -> onGrupoSelecionado(grupo.id, grupo.nome)
@@ -79,9 +86,7 @@ fun GruposPeladaScreen(
     val mostrarTelaCompartilhamento by viewModel.mostrarTelaCompartilhamento.collectAsState()
     val grupoParaCompartilhar by viewModel.grupoParaCompartilhar.collectAsState()
     val grupoParaCompartilharNaoNulo = grupoParaCompartilhar
-    val context = LocalContext.current
 
-    // Estados para o Sorteio Rápido Dialog
     val mostrarDialogoConfigSorteioRapido by viewModel.mostrarDialogoConfigSorteioRapido.collectAsState()
     val grupoSelecionadoParaSorteioRapido by viewModel.grupoSelecionadoParaSorteioRapido.collectAsState()
     val jogadoresAtivosParaDialogoSorteioRapido by viewModel.jogadoresAtivosParaDialogoSorteioRapido.collectAsState()
@@ -92,16 +97,15 @@ fun GruposPeladaScreen(
     val numeroDeTimesSorteioRapido by viewModel.numeroDeTimesSorteioRapido.collectAsState()
     val navegarParaResultadoSorteio by viewModel.navegarParaResultadoSorteio.collectAsState()
     val erroSorteioRapidoAtual by viewModel.erroSorteioRapido.collectAsState()
-    val podeRealizarSorteioRapido by viewModel.podeRealizarSorteioRapido.collectAsState() // Adicionado
+    val podeRealizarSorteioRapido by viewModel.podeRealizarSorteioRapido.collectAsState()
 
     LaunchedEffect(navegarParaResultadoSorteio) {
         if (navegarParaResultadoSorteio == true) {
+            viewModel.onNavegacaoParaResultadoSorteioRealizada()
             try {
                 onNavigateToSorteioResultado(true)
             } catch (e: Exception) {
                 Log.e("GruposPeladaScreen", "Erro ao solicitar navegação para ResultadoSorteio", e)
-            } finally {
-                viewModel.onNavegacaoParaResultadoSorteioRealizada()
             }
         }
     }
@@ -115,12 +119,17 @@ fun GruposPeladaScreen(
     } else {
         Scaffold(
             topBar = {
-                TopAppBar(
+                CenterAlignedTopAppBar(
                     title = { Text("Minhas Peladas") },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
+                    navigationIcon = {
+                        IconButton(onClick = onSairClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                contentDescription = "Sair",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    },
                     actions = {
                         SingleChoiceSegmentedButtonRow(
                             modifier = Modifier.padding(horizontal = 8.dp)
@@ -162,22 +171,26 @@ fun GruposPeladaScreen(
                                 )
                             ) {}
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
             },
             floatingActionButton = {
                 Column(horizontalAlignment = Alignment.End) {
-                    if (grupos.isNotEmpty()) {
-                        FloatingActionButton(
-                            onClick = { mostrarDialogoSelecionarGrupoParaSorteioRapido = true },
-                            // modifier = Modifier.size(48.dp), // Removido para usar o tamanho padrão
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = "Sorteio Rápido de Grupo Existente")
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
+                    FloatingActionButton(
+                        onClick = { mostrarDialogoOpcoesSorteio = true }, // Modificado para abrir o diálogo de opções
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Icon(Icons.Filled.ContentPaste, contentDescription = "Iniciar Sorteio") // Ícone mantido, descrição pode ser ajustada
                     }
+                    // FAB de Sorteio Rápido de Grupo Existente REMOVIDO
                     FloatingActionButton(
                         onClick = { viewModel.mostrarDialogoCriarGrupo() },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -213,6 +226,16 @@ fun GruposPeladaScreen(
                             Text("CRIAR GRUPO")
                         }
                         Spacer(modifier = Modifier.height(16.dp))
+                        // Adicionar aqui o botão para o novo diálogo de opções de sorteio se a lista de grupos estiver vazia
+                        // Ou incentivar o usuário a colar uma lista.
+                        Button(
+                            onClick = { mostrarDialogoOpcoesSorteio = true },
+                        ) {
+                            Icon(Icons.Filled.ContentPaste, "Sortear Jogadores")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("SORTEAR JOGADORES")
+                        }
+
                     }
                 } else {
                     when (tipoVisualizacao) {
@@ -257,6 +280,41 @@ fun GruposPeladaScreen(
         )
     }
 
+    if (mostrarDialogoColaLista) {
+        ColaListaJogadoresDialog(
+            onDismissRequest = { mostrarDialogoColaLista = false },
+            onConfirmar = { textoColado ->
+                mostrarDialogoColaLista = false
+                val nomesParseados = viewModel.parsearListaDeJogadores(textoColado)
+                if (nomesParseados.isNotEmpty()) {
+                    viewModel.prepararSorteioDeListaColada(nomesParseados)
+                } else {
+                    Toast.makeText(context, "Nenhum nome válido encontrado na lista.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+
+    // Novo diálogo de Opções de Sorteio
+    if (mostrarDialogoOpcoesSorteio) {
+        DialogoOpcoesSorteio(
+            onDismissRequest = { mostrarDialogoOpcoesSorteio = false },
+            onColarListaClick = {
+                mostrarDialogoOpcoesSorteio = false
+                mostrarDialogoColaLista = true
+            },
+            onSelecionarGrupoClick = {
+                mostrarDialogoOpcoesSorteio = false
+                if (grupos.isNotEmpty()) {
+                    mostrarDialogoSelecionarGrupoParaSorteioRapido = true
+                } else {
+                    Toast.makeText(context, "Nenhum grupo cadastrado. Crie um grupo primeiro.", Toast.LENGTH_LONG).show()
+                }
+            },
+            temGrupos = grupos.isNotEmpty()
+        )
+    }
+
     SorteioRapidoDialog(
         showDialog = mostrarDialogoConfigSorteioRapido,
         grupoPelada = grupoSelecionadoParaSorteioRapido,
@@ -267,14 +325,15 @@ fun GruposPeladaScreen(
         jogadoresPorTimeManual = jogadoresPorTimeSorteioRapido,
         numeroDeTimesManual = numeroDeTimesSorteioRapido,
         erroAtual = erroSorteioRapidoAtual,
-        podeRealizarSorteio = podeRealizarSorteioRapido, // Adicionado
+        podeRealizarSorteio = podeRealizarSorteioRapido,
+        isSorteioListaColada = viewModel.isSorteioDeListaColada.collectAsState().value,
         onDismissRequest = { viewModel.onFecharDialogoSorteioRapido() },
         onUsarPerfilChanged = { viewModel.onUsarPerfilExistenteSorteioRapidoChanged(it) },
         onPerfilSelecionadoChanged = { viewModel.onPerfilConfigSorteioRapidoSelecionado(it) },
         onJogadoresPorTimeManualChanged = { viewModel.onJogadoresPorTimeSorteioRapidoChanged(it.toIntOrNull() ?: 0) },
         onNumeroDeTimesManualChanged = { viewModel.onNumeroDeTimesSorteioRapidoChanged(it.toIntOrNull() ?: 0) },
         onConfirmSorteio = { viewModel.onConfirmarSorteioRapido() },
-        onClearError = { viewModel.limparErroSorteioRapido() } // Adicionado
+        onClearError = { viewModel.limparErroSorteioRapido() }
     )
 
     if (mostrarTelaCompartilhamento && grupoParaCompartilharNaoNulo != null) {
@@ -288,19 +347,56 @@ fun GruposPeladaScreen(
         )
     }
 
-    // Novo diálogo de seleção de grupo para sorteio rápido
     if (mostrarDialogoSelecionarGrupoParaSorteioRapido) {
         SelecionarGrupoParaSorteioRapidoDialog(
             showDialog = mostrarDialogoSelecionarGrupoParaSorteioRapido,
-            grupos = grupos, // Passa a lista de grupos carregada
+            grupos = grupos,
             onDismissRequest = { mostrarDialogoSelecionarGrupoParaSorteioRapido = false },
             onGrupoSelecionado = { grupo ->
-                viewModel.onAbrirDialogoSorteioRapido(grupo) // Chama o ViewModel para abrir o diálogo de config
-                mostrarDialogoSelecionarGrupoParaSorteioRapido = false // Fecha este diálogo de seleção
+                viewModel.onAbrirDialogoSorteioRapido(grupo)
+                mostrarDialogoSelecionarGrupoParaSorteioRapido = false
             }
         )
     }
 }
+
+// Novo Composable para o diálogo de opções de sorteio
+@Composable
+fun DialogoOpcoesSorteio(
+    onDismissRequest: () -> Unit,
+    onColarListaClick: () -> Unit,
+    onSelecionarGrupoClick: () -> Unit,
+    temGrupos: Boolean
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text("Iniciar Novo Sorteio") },
+        text = { Text("Como você deseja fornecer os jogadores?") },
+        confirmButton = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onColarListaClick,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                ) {
+                    Text("Colar Lista de Jogadores")
+                }
+                Button(
+                    onClick = onSelecionarGrupoClick,
+                    enabled = temGrupos, // Desabilita se não houver grupos
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Selecionar Grupo Existente")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
 
 @Composable
 fun SelecionarGrupoParaSorteioRapidoDialog(
@@ -313,7 +409,7 @@ fun SelecionarGrupoParaSorteioRapidoDialog(
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Selecionar Grupo para Sorteio Rápido") },
+        title = { Text("Selecionar Grupo para Sorteio") },
         text = {
             if (grupos.isEmpty()) {
                 Text("Nenhum grupo cadastrado para selecionar.")
@@ -359,7 +455,7 @@ fun ListaVisualizacao(
                 onClick = { onGrupoClick(grupo) },
                 onEditarClick = { onEditarClick(grupo) },
                 onExcluirClick = { onExcluirClick(grupo) },
-                onSorteioRapidoClick = { onSorteioRapidoClick(grupo) }
+                onSorteioRapidoClick = { onSorteioRapidoClick(grupo) } // Este click pode ser removido dos itens individuais se o FAB for a única entrada
             )
         }
     }
@@ -385,7 +481,7 @@ fun CardsVisualizacao(
                 onClick = { onGrupoClick(grupo) },
                 onEditarClick = { onEditarClick(grupo) },
                 onExcluirClick = { onExcluirClick(grupo) },
-                onSorteioRapidoClick = { onSorteioRapidoClick(grupo) }
+                onSorteioRapidoClick = { onSorteioRapidoClick(grupo) } // Idem
             )
         }
     }
@@ -411,7 +507,7 @@ fun MinimalistaVisualizacao(
                 onClick = { onGrupoClick(grupo) },
                 onEditarClick = { onEditarClick(grupo) },
                 onExcluirClick = { onExcluirClick(grupo) },
-                onSorteioRapidoClick = { onSorteioRapidoClick(grupo) }
+                onSorteioRapidoClick = { onSorteioRapidoClick(grupo) } // Idem
             )
         }
     }
@@ -423,7 +519,7 @@ fun GrupoItemLista(
     onClick: () -> Unit,
     onEditarClick: () -> Unit,
     onExcluirClick: () -> Unit,
-    onSorteioRapidoClick: () -> Unit
+    onSorteioRapidoClick: () -> Unit // Considerar remover se o FAB é a única entrada para sorteio
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -471,10 +567,11 @@ fun GrupoItemLista(
                     Icon(Icons.Default.MoreVert, "Mais opções")
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("Sorteio Rápido") }, onClick = {
-                        onSorteioRapidoClick()
-                        showMenu = false
-                    })
+                    // A opção "Sorteio Rápido" no menu do item pode ser removida se o FAB for a única entrada
+                    // DropdownMenuItem(text = { Text("Sorteio Rápido") }, onClick = {
+                    //     onSorteioRapidoClick()
+                    //     showMenu = false
+                    // })
                     DropdownMenuItem(text = { Text("Editar") }, onClick = {
                         onEditarClick()
                         showMenu = false
@@ -495,7 +592,7 @@ fun GrupoItemCard(
     onClick: () -> Unit,
     onEditarClick: () -> Unit,
     onExcluirClick: () -> Unit,
-    onSorteioRapidoClick: () -> Unit
+    onSorteioRapidoClick: () -> Unit // Considerar remover
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -520,10 +617,10 @@ fun GrupoItemCard(
                         Icon(Icons.Default.MoreVert, "Mais opções", Modifier.size(16.dp))
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Text("Sorteio Rápido") }, onClick = {
-                            onSorteioRapidoClick()
-                            showMenu = false
-                        })
+                        // DropdownMenuItem(text = { Text("Sorteio Rápido") }, onClick = {
+                        //     onSorteioRapidoClick()
+                        //     showMenu = false
+                        // })
                         DropdownMenuItem(text = { Text("Editar") }, onClick = {
                             onEditarClick()
                             showMenu = false
@@ -566,7 +663,7 @@ fun GrupoItemMinimalista(
     onClick: () -> Unit,
     onEditarClick: () -> Unit,
     onExcluirClick: () -> Unit,
-    onSorteioRapidoClick: () -> Unit
+    onSorteioRapidoClick: () -> Unit // Considerar remover
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -593,10 +690,10 @@ fun GrupoItemMinimalista(
                     Icon(Icons.Default.Menu, "Opções", Modifier.align(Alignment.Center).size(16.dp), tint = MaterialTheme.colorScheme.onPrimary)
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("Sorteio Rápido") }, onClick = {
-                        onSorteioRapidoClick()
-                        showMenu = false
-                    })
+                    // DropdownMenuItem(text = { Text("Sorteio Rápido") }, onClick = {
+                    //     onSorteioRapidoClick()
+                    //     showMenu = false
+                    // })
                     DropdownMenuItem(text = { Text("Editar") }, onClick = {
                         onEditarClick()
                         showMenu = false
@@ -676,13 +773,19 @@ fun DialogoAdicionarEditarGrupo(
     var imagemSelecionada by remember { mutableStateOf(grupo?.imagemUrl ?: "ic_pelada_default_1") }
 
     if (mostrarTimePicker) {
-        AlertDialog(
+        BasicAlertDialog(
             onDismissRequest = { mostrarTimePicker = false },
             properties = DialogProperties(usePlatformDefaultWidth = false),
-            modifier = Modifier.fillMaxWidth(0.9f),
-            content = {
+            modifier = Modifier.fillMaxWidth(0.9f)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = AlertDialogDefaults.TonalElevation
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface, RoundedCornerShape(28.dp)).padding(24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("Selecione o horário", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
@@ -706,7 +809,7 @@ fun DialogoAdicionarEditarGrupo(
                     }
                 }
             }
-        )
+        }
     }
 
     Dialog(onDismissRequest = onDismissRequest) {

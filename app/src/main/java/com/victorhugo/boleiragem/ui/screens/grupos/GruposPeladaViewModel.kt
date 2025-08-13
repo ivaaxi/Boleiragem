@@ -7,6 +7,7 @@ import com.victorhugo.boleiragem.data.model.ConfiguracaoSorteio
 import com.victorhugo.boleiragem.data.model.DiaSemana
 import com.victorhugo.boleiragem.data.model.GrupoPelada
 import com.victorhugo.boleiragem.data.model.Jogador
+import com.victorhugo.boleiragem.data.model.PosicaoJogador // Import adicionado
 import com.victorhugo.boleiragem.data.model.ResultadoSorteio
 import com.victorhugo.boleiragem.data.model.TipoRecorrencia
 import com.victorhugo.boleiragem.data.model.Time
@@ -69,6 +70,7 @@ class GruposPeladaViewModel @Inject constructor(
     private val _mostrarTelaCompartilhamento = MutableStateFlow(false)
     val mostrarTelaCompartilhamento: StateFlow<Boolean> = _mostrarTelaCompartilhamento.asStateFlow()
 
+    // Estados para Sorteio Rápido e Sorteio de Lista Colada
     private val _mostrarDialogoConfigSorteioRapido = MutableStateFlow(false)
     val mostrarDialogoConfigSorteioRapido: StateFlow<Boolean> = _mostrarDialogoConfigSorteioRapido.asStateFlow()
 
@@ -102,6 +104,13 @@ class GruposPeladaViewModel @Inject constructor(
     private val _podeRealizarSorteioRapido = MutableStateFlow(false)
     val podeRealizarSorteioRapido: StateFlow<Boolean> = _podeRealizarSorteioRapido.asStateFlow()
 
+    // Novos estados para a funcionalidade de colar lista
+    private val _listaJogadoresColados = MutableStateFlow<List<Jogador>>(emptyList())
+    val listaJogadoresColados: StateFlow<List<Jogador>> = _listaJogadoresColados.asStateFlow()
+
+    private val _isSorteioDeListaColada = MutableStateFlow(false)
+    val isSorteioDeListaColada: StateFlow<Boolean> = _isSorteioDeListaColada.asStateFlow()
+
     init {
         carregarGrupos()
     }
@@ -129,9 +138,8 @@ class GruposPeladaViewModel @Inject constructor(
                 mapaContagem[grupo.id] = jogadorRepository.countJogadoresAtivosPorGrupo(grupo.id)
             }
             _jogadoresPorGrupo.value = mapaContagem
-            // Atualizar contagem para o diálogo se já estiver aberto e o grupo for o mesmo
             _grupoSelecionadoParaSorteioRapido.value?.let { grupoAtualDialogo ->
-                if (_mostrarDialogoConfigSorteioRapido.value) {
+                if (_mostrarDialogoConfigSorteioRapido.value && !_isSorteioDeListaColada.value) { // Só atualiza se não for lista colada
                     _jogadoresAtivosParaDialogoSorteioRapido.value = _jogadoresPorGrupo.value[grupoAtualDialogo.id] ?: 0
                     validarConfiguracaoSorteioRapido()
                 }
@@ -178,8 +186,8 @@ class GruposPeladaViewModel @Inject constructor(
                 )
                 if (grupoAtual != null) grupoPeladaRepository.atualizarGrupo(grupoSalvar) else grupoPeladaRepository.inserirGrupo(grupoSalvar)
                 fecharDialogoGrupo()
-                kotlinx.coroutines.delay(200) // Pequeno delay para garantir que a UI possa reagir antes de recarregar
-                carregarGrupos() // Isso chamará atualizarJogadoresPorGrupo()
+                kotlinx.coroutines.delay(200) 
+                carregarGrupos()
             } catch (e: Exception) { Log.e("GruposVM", "Erro ao salvar grupo", e) }
         }
     }
@@ -207,15 +215,16 @@ class GruposPeladaViewModel @Inject constructor(
     fun exibirTelaCompartilhamento(grupo: GrupoPelada) { _grupoParaCompartilhar.value = grupo; _mostrarTelaCompartilhamento.value = true }
     fun ocultarTelaCompartilhamento() { _mostrarTelaCompartilhamento.value = false; _grupoParaCompartilhar.value = null }
 
+    // --- Funções para Sorteio Rápido e Sorteio de Lista Colada ---
+
     fun onAbrirDialogoSorteioRapido(grupo: GrupoPelada) {
+        _isSorteioDeListaColada.value = false // Garante que é um sorteio de grupo
         _grupoSelecionadoParaSorteioRapido.value = grupo
         _erroSorteioRapido.value = null
-        configuracaoRepository.setGrupoId(grupo.id)
+        configuracaoRepository.setGrupoId(grupo.id) // Configura o contexto do grupo para buscar perfis
         viewModelScope.launch {
             try {
-                // Busca a contagem de jogadores mais recente diretamente
                 _jogadoresAtivosParaDialogoSorteioRapido.value = jogadorRepository.countJogadoresAtivosPorGrupo(grupo.id)
-
                 val perfis = configuracaoRepository.getTodasConfiguracoes().firstOrNull() ?: emptyList()
                 _perfisConfiguracaoSorteio.value = perfis
                 val perfilPadrao = perfis.firstOrNull { p -> p.isPadrao } ?: perfis.firstOrNull()
@@ -225,21 +234,74 @@ class GruposPeladaViewModel @Inject constructor(
                     _jogadoresPorTimeSorteioRapido.value = perfilPadrao.qtdJogadoresPorTime
                     _numeroDeTimesSorteioRapido.value = perfilPadrao.qtdTimes
                 } else {
-                    // Mantém valores padrão ou busca de um repositório de configurações default
-                    _jogadoresPorTimeSorteioRapido.value = 5
-                    _numeroDeTimesSorteioRapido.value = 2
+                    _jogadoresPorTimeSorteioRapido.value = 5 // Valor padrão
+                    _numeroDeTimesSorteioRapido.value = 2 // Valor padrão
                 }
-                validarConfiguracaoSorteioRapido() // Valida com a contagem atualizada
-            } catch (e: Exception) {
-                Log.e("GruposVM", "Erro ao carregar dados para sorteio rápido", e)
-                _jogadoresAtivosParaDialogoSorteioRapido.value = 0 // Reseta em caso de erro
-                _perfisConfiguracaoSorteio.value = emptyList()
-                _usarPerfilExistenteSorteioRapido.value = false
-                 _jogadoresPorTimeSorteioRapido.value = 5
-                 _numeroDeTimesSorteioRapido.value = 2
                 validarConfiguracaoSorteioRapido()
+            } catch (e: Exception) {
+                Log.e("GruposVM", "Erro ao carregar dados para sorteio rápido de grupo", e)
+                // Resetar estados em caso de erro
             }
         }
+        _mostrarDialogoConfigSorteioRapido.value = true
+    }
+
+    fun parsearListaDeJogadores(textoLista: String): List<String> {
+        val nomesExtraidos = mutableListOf<String>()
+        val linhas = textoLista.lines()
+        var processarLinhas = true
+
+        for (linha in linhas) {
+            val linhaTrimada = linha.trim()
+            if (linhaTrimada.equals("LISTA DE ESPERA:", ignoreCase = true)) {
+                processarLinhas = false
+            }
+            if (!processarLinhas) continue
+
+            val regex = Regex("^\\s*\\d+\\s*-\\s*(.+)")
+            val match = regex.find(linhaTrimada)
+            if (match != null) {
+                val nome = match.groupValues[1].trim()
+                if (nome.isNotBlank()) {
+                    nomesExtraidos.add(nome)
+                }
+            }
+        }
+        Log.d("GruposVM", "Nomes parseados: $nomesExtraidos")
+        return nomesExtraidos
+    }
+
+    fun prepararSorteioDeListaColada(nomes: List<String>) {
+        if (nomes.isEmpty()) {
+            _erroSorteioRapido.value = "Nenhum nome válido encontrado na lista."
+            return
+        }
+        _isSorteioDeListaColada.value = true
+        _listaJogadoresColados.value = nomes.mapIndexed { index, nome ->
+            Jogador(
+                id = (index + 1).toLong() * -1, // IDs negativos para temporários
+                nome = nome,
+                ativo = true,
+                grupoId = -2L, // ID de grupo dummy para jogadores de lista colada
+                posicaoPrincipal = PosicaoJogador.MEIO_CAMPO, // Valor padrão
+                posicaoSecundaria = null, // Valor padrão
+                notaPosicaoPrincipal = 3, // Valor padrão (escala 1-5)
+                notaPosicaoSecundaria = null, // Valor padrão
+                disponivel = true // Default para jogadores da lista
+            )
+        }
+        _grupoSelecionadoParaSorteioRapido.value = GrupoPelada(id = -2L, nome = "Jogadores da Lista Colada", local = "N/A", horario = "N/A") // Grupo Dummy
+        _jogadoresAtivosParaDialogoSorteioRapido.value = nomes.size
+
+        // Resetar configurações de perfil para sorteio de lista colada, forçando configuração manual
+        _perfisConfiguracaoSorteio.value = emptyList() // Sem perfis para lista colada
+        _perfilConfigSelecionadoSorteioRapido.value = null
+        _usarPerfilExistenteSorteioRapido.value = false // Força configuração manual
+        _jogadoresPorTimeSorteioRapido.value = 5 // Reset para padrão
+        _numeroDeTimesSorteioRapido.value = Math.max(1, nomes.size / 5) // Sugestão inicial de times
+
+        limparErroSorteioRapido()
+        validarConfiguracaoSorteioRapido() // Valida com a nova contagem e config
         _mostrarDialogoConfigSorteioRapido.value = true
     }
 
@@ -248,7 +310,7 @@ class GruposPeladaViewModel @Inject constructor(
         val jogadoresPorTimeConfig: Int
         val numeroDeTimesConfig: Int
 
-        if (_usarPerfilExistenteSorteioRapido.value) {
+        if (_usarPerfilExistenteSorteioRapido.value && !_isSorteioDeListaColada.value) { // Perfis só para grupos normais
             val perfil = _perfilConfigSelecionadoSorteioRapido.value
             if (perfil == null && _perfisConfiguracaoSorteio.value.isNotEmpty()) {
                 _erroSorteioRapido.value = "Selecione um perfil de configuração."
@@ -267,12 +329,12 @@ class GruposPeladaViewModel @Inject constructor(
         }
 
         if (jogadoresPorTimeConfig <= 0) {
-            _erroSorteioRapido.value = "Jogadores por time deve ser maior que zero."
+            _erroSorteioRapido.value = "Jogadores por time deve ser > 0."
             _podeRealizarSorteioRapido.value = false
             return
         }
         if (numeroDeTimesConfig <= 0) {
-            _erroSorteioRapido.value = "Número de times deve ser maior que zero."
+            _erroSorteioRapido.value = "Número de times deve ser > 0."
             _podeRealizarSorteioRapido.value = false
             return
         }
@@ -285,10 +347,11 @@ class GruposPeladaViewModel @Inject constructor(
         }
 
         if (jogadoresDisponiveis < jogadoresNecessarios) {
-            _erroSorteioRapido.value = "São necessários $jogadoresNecessarios jogadores (${numeroDeTimesConfig}x${jogadoresPorTimeConfig}). Grupo: $jogadoresDisponiveis ativos."
+            _erroSorteioRapido.value = "Necessários: $jogadoresNecessarios (${numeroDeTimesConfig}x${jogadoresPorTimeConfig}). Lista tem: $jogadoresDisponiveis."
             _podeRealizarSorteioRapido.value = false
         } else if (jogadoresDisponiveis > jogadoresNecessarios) {
-            _erroSorteioRapido.value = "Grupo: $jogadoresDisponiveis ativos. Serão usados $jogadoresNecessarios (${numeroDeTimesConfig}x${jogadoresPorTimeConfig}). ${jogadoresDisponiveis - jogadoresNecessarios} ficarão de fora."
+            val sobram = jogadoresDisponiveis - jogadoresNecessarios
+            _erroSorteioRapido.value = "Lista: $jogadoresDisponiveis. Sorteio: $jogadoresNecessarios (${numeroDeTimesConfig}x${jogadoresPorTimeConfig}). ${sobram} ficarão de fora."
             _podeRealizarSorteioRapido.value = true
         } else {
             _erroSorteioRapido.value = null
@@ -298,21 +361,32 @@ class GruposPeladaViewModel @Inject constructor(
 
     fun onFecharDialogoSorteioRapido() {
         _mostrarDialogoConfigSorteioRapido.value = false
+        if (_isSorteioDeListaColada.value) { // Reset específico para lista colada
+            _isSorteioDeListaColada.value = false
+            _listaJogadoresColados.value = emptyList()
+            _grupoSelecionadoParaSorteioRapido.value = null // Limpa grupo dummy
+        }
     }
 
     fun onUsarPerfilExistenteSorteioRapidoChanged(usar: Boolean) {
-        _usarPerfilExistenteSorteioRapido.value = usar
-        if (usar) {
-            val perfilPadrao = _perfisConfiguracaoSorteio.value.firstOrNull { p -> p.isPadrao } ?: _perfisConfiguracaoSorteio.value.firstOrNull()
-            _perfilConfigSelecionadoSorteioRapido.value = perfilPadrao
-        } else {
+        if (_isSorteioDeListaColada.value) { // Não permitir uso de perfil para lista colada
+            _usarPerfilExistenteSorteioRapido.value = false
             _perfilConfigSelecionadoSorteioRapido.value = null
+        } else {
+            _usarPerfilExistenteSorteioRapido.value = usar
+            if (usar) {
+                val perfilPadrao = _perfisConfiguracaoSorteio.value.firstOrNull { p -> p.isPadrao } ?: _perfisConfiguracaoSorteio.value.firstOrNull()
+                _perfilConfigSelecionadoSorteioRapido.value = perfilPadrao
+            } else {
+                _perfilConfigSelecionadoSorteioRapido.value = null
+            }
         }
         limparErroSorteioRapido()
         validarConfiguracaoSorteioRapido()
     }
 
     fun onPerfilConfigSorteioRapidoSelecionado(perfil: ConfiguracaoSorteio) {
+        if (_isSorteioDeListaColada.value) return // Não aplicável para lista colada
         _perfilConfigSelecionadoSorteioRapido.value = perfil
         limparErroSorteioRapido()
         validarConfiguracaoSorteioRapido()
@@ -337,73 +411,75 @@ class GruposPeladaViewModel @Inject constructor(
     fun onConfirmarSorteioRapido() {
         if (!_podeRealizarSorteioRapido.value) {
             if (_erroSorteioRapido.value.isNullOrBlank()) {
-                 _erroSorteioRapido.value = "Configuração de sorteio inválida ou jogadores insuficientes."
+                 _erroSorteioRapido.value = "Configuração inválida ou jogadores insuficientes."
             }
             return
         }
 
-        val grupo = _grupoSelecionadoParaSorteioRapido.value
-        if (grupo == null) {
-            _erroSorteioRapido.value = "Nenhum grupo selecionado."
+        val grupoDummyOuReal = _grupoSelecionadoParaSorteioRapido.value
+        if (grupoDummyOuReal == null) {
+            _erroSorteioRapido.value = "Nenhum grupo ou lista base selecionado."
             return
         }
 
         viewModelScope.launch {
             try {
-                val jogadoresAtivos = jogadorRepository.getJogadoresListAtivosPorGrupo(grupo.id)
-
-                if (jogadoresAtivos.isEmpty()) {
-                    _erroSorteioRapido.value = "Não há jogadores ativos no grupo para o sorteio."
-                    _podeRealizarSorteioRapido.value = false // Garante que não possa prosseguir
-                    return@launch
+                val jogadoresParaSorteio: List<Jogador>
+                if (_isSorteioDeListaColada.value) {
+                    jogadoresParaSorteio = _listaJogadoresColados.value
+                    if (jogadoresParaSorteio.isEmpty()) {
+                        _erroSorteioRapido.value = "Não há jogadores na lista colada para o sorteio."
+                        return@launch
+                    }
+                } else {
+                    jogadoresParaSorteio = jogadorRepository.getJogadoresListAtivosPorGrupo(grupoDummyOuReal.id)
+                    if (jogadoresParaSorteio.isEmpty()) {
+                        _erroSorteioRapido.value = "Não há jogadores ativos no grupo para o sorteio."
+                        return@launch
+                    }
                 }
 
                 val configSorteioUsada: ConfiguracaoSorteio
-                if (_usarPerfilExistenteSorteioRapido.value && _perfilConfigSelecionadoSorteioRapido.value != null) {
+                if (_usarPerfilExistenteSorteioRapido.value && _perfilConfigSelecionadoSorteioRapido.value != null && !_isSorteioDeListaColada.value) {
                     configSorteioUsada = _perfilConfigSelecionadoSorteioRapido.value!!
                 } else {
                     configSorteioUsada = ConfiguracaoSorteio(
                         id = 0L, 
-                        nome = "Sorteio Rápido Manual",
+                        nome = if (_isSorteioDeListaColada.value) "Sorteio Lista Colada" else "Sorteio Rápido Manual",
                         qtdJogadoresPorTime = _jogadoresPorTimeSorteioRapido.value,
                         qtdTimes = _numeroDeTimesSorteioRapido.value,
-                        aleatorio = true, // Sorteio rápido é sempre aleatório por enquanto
+                        aleatorio = true, 
                         isPadrao = false,
-                        grupoId = grupo.id
-                        // criteriosExtras pode ser omitido se aleatorio = true for suficiente
+                        grupoId = if (_isSorteioDeListaColada.value) -2L else grupoDummyOuReal.id // ID dummy para lista colada
                     )
                 }
 
                 val jogadoresNecessarios = configSorteioUsada.qtdJogadoresPorTime * configSorteioUsada.qtdTimes
-                if (jogadoresAtivos.size < jogadoresNecessarios) {
-                    _erroSorteioRapido.value = "Jogadores insuficientes. Necessários: $jogadoresNecessarios, Disponíveis: ${jogadoresAtivos.size}."
-                    _podeRealizarSorteioRapido.value = false // Garante que não possa prosseguir
+                if (jogadoresParaSorteio.size < jogadoresNecessarios) {
+                    _erroSorteioRapido.value = "Jogadores insuficientes. Necessários: $jogadoresNecessarios, Disponíveis: ${jogadoresParaSorteio.size}."
                     return@launch
                 }
 
-                // Lógica de simulação ou chamada real ao SorteioUseCase
-                // A simulação abaixo é um placeholder e pode ser substituída pela chamada real.
-                Log.d("GruposVM", "SORTEANDO com ${jogadoresAtivos.size} jogadores, ${configSorteioUsada.qtdTimes} times de ${configSorteioUsada.qtdJogadoresPorTime}")
-                val jogadoresSorteaveis = if (jogadoresAtivos.size > jogadoresNecessarios) {
-                    jogadoresAtivos.shuffled().take(jogadoresNecessarios)
-                } else {
-                    jogadoresAtivos.shuffled()
-                }
+                Log.d("GruposVM", "SORTEANDO (Lista Colada: ${_isSorteioDeListaColada.value}) com ${jogadoresParaSorteio.size} jogadores, ${configSorteioUsada.qtdTimes} times de ${configSorteioUsada.qtdJogadoresPorTime}")
+                val jogadoresSorteaveis = jogadoresParaSorteio.shuffled()
 
-                val resultadoSorteio: ResultadoSorteio? = sorteioUseCase.sortearTimesRapido(jogadoresSorteaveis, configSorteioUsada, configSorteioUsada.qtdTimes)
+                val resultadoSorteio: ResultadoSorteio? = sorteioUseCase.sortearTimesRapido(
+                    jogadores = jogadoresSorteaveis, 
+                    configuracao = configSorteioUsada, 
+                    numeroTimesPrincipais = configSorteioUsada.qtdTimes
+                )
 
                 if (resultadoSorteio != null && resultadoSorteio.times.isNotEmpty()) {
-                    sorteioRepository.salvarResultadoSorteioRapido(resultadoSorteio)
+                    sorteioRepository.salvarResultadoSorteioRapido(resultadoSorteio) // Salva como sorteio rápido
                     _navegarParaResultadoSorteio.value = true
-                    onFecharDialogoSorteioRapido()
+                    onFecharDialogoSorteioRapido() // Isso também vai resetar _isSorteioDeListaColada
                 } else {
-                    _erroSorteioRapido.value = "Falha ao formar times. Verifique a configuração e jogadores disponíveis."
-                    Log.e("GruposVM", "Sorteio (real ou simulado) não formou times ou falhou.")
+                    _erroSorteioRapido.value = "Falha ao formar times. Verifique a configuração e jogadores."
                 }
 
             } catch (e: Exception) {
-                Log.e("GruposVM", "Erro ao confirmar sorteio rápido", e)
-                _erroSorteioRapido.value = "Erro inesperado ao sortear: ${e.localizedMessage}"
+                Log.e("GruposVM", "Erro ao confirmar sorteio", e)
+                _erroSorteioRapido.value = "Erro inesperado: ${e.localizedMessage}"
             }
         }
     }
